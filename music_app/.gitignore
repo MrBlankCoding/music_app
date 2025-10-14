@@ -1,0 +1,23 @@
+# Misc
+*.log
+.DS_Store
+.env
+
+# IDE
+*.iml
+.idea/
+.vscode/
+
+# Flutter/Dart
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+build/
+coverage/
+
+# Platform builds
+android/app/debug
+android/app/profile
+android/app/release
+ios/Flutter/.last_build_id
