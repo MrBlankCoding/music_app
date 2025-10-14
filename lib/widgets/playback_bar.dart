@@ -1,9 +1,11 @@
+
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class PlaybackBar extends StatelessWidget {
   final AudioPlayer audioPlayer;
-  final String? currentSongName;
+  final Map<String, dynamic>? currentSong;
   final bool isPlaying;
   final Duration position;
   final Duration duration;
@@ -17,7 +19,7 @@ class PlaybackBar extends StatelessWidget {
   const PlaybackBar({
     super.key,
     required this.audioPlayer,
-    required this.currentSongName,
+    required this.currentSong,
     required this.isPlaying,
     required this.position,
     required this.duration,
@@ -37,7 +39,7 @@ class PlaybackBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (currentSongName == null) return const SizedBox.shrink();
+    if (currentSong == null) return const SizedBox.shrink();
 
     return Container(
       color: Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -47,6 +49,29 @@ class PlaybackBar extends StatelessWidget {
         children: [
           Row(
             children: [
+              if (currentSong!['thumbnailUrl'] != null)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: CachedNetworkImage(
+                    imageUrl: currentSong!['thumbnailUrl'],
+                    width: 48,
+                    height: 48,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(
+                      width: 48,
+                      height: 48,
+                      color: Colors.grey[300],
+                      child: const Icon(Icons.music_note),
+                    ),
+                    errorWidget: (context, url, error) => Container(
+                      width: 48,
+                      height: 48,
+                      color: Colors.grey[300],
+                      child: const Icon(Icons.broken_image),
+                    ),
+                  ),
+                ),
+              const SizedBox(width: 8),
               // Shuffle button
               if (onShuffle != null)
                 IconButton(
@@ -82,7 +107,7 @@ class PlaybackBar extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      currentSongName ?? '',
+                      currentSong!['name'] ?? '',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontWeight: FontWeight.bold),
@@ -92,7 +117,7 @@ class PlaybackBar extends StatelessWidget {
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ],
-                ),
+                ), 
               ),
               // Stop button
               IconButton(

@@ -1,6 +1,10 @@
+
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:provider/provider.dart';
 import '../models/youtube_video.dart';
+import '../providers/music_player_provider.dart';
+import '../providers/search_provider.dart';
 import 'video_details_sheet.dart';
 
 class MusicCard extends StatelessWidget {
@@ -10,6 +14,9 @@ class MusicCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final musicPlayerProvider = context.read<MusicPlayerProvider>();
+    final searchProvider = context.read<SearchProvider>();
+
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       leading: ClipRRect(
@@ -44,6 +51,9 @@ class MusicCard extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
       ),
       onTap: () {
+        musicPlayerProvider.playYouTubeVideo(video, searchProvider.videos);
+      },
+      onLongPress: () {
         showModalBottomSheet(
           context: context,
           isScrollControlled: true,

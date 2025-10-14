@@ -1,48 +1,35 @@
+
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:audioplayers/audioplayers.dart';
+import '../providers/playlist_provider.dart';
 import '../models/playlist.dart';
-import '../services/playlist_service.dart';
 import 'playlist_detail_screen.dart';
 
-class PlaylistsScreen extends StatefulWidget {
+class PlaylistsScreen extends StatelessWidget {
   const PlaylistsScreen({super.key});
 
-  @override
-  State<PlaylistsScreen> createState() => _PlaylistsScreenState();
-}
-
-class _PlaylistsScreenState extends State<PlaylistsScreen> {
-  final PlaylistService _playlistService = PlaylistService();
-  List<Playlist> _playlists = [];
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadPlaylists();
-  }
-
-  Future<void> _loadPlaylists() async {
-    setState(() => _isLoading = true);
-    try {
-      await _playlistService.initialize();
-      final playlists = await _playlistService.getPlaylists();
-      setState(() {
-        _playlists = playlists;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading playlists: $e')),
-        );
+  Future<String> _getPlaylistDuration(Playlist playlist) async {
+    final player = AudioPlayer();
+    int totalSeconds = 0;
+    for (final songPath in playlist.songPaths) {
+      await player.setSourceDeviceFile(songPath);
+      final duration = await player.getDuration();
+      if (duration != null) {
+        totalSeconds += duration.inSeconds;
       }
     }
+    await player.dispose();
+    final duration = Duration(seconds: totalSeconds);
+    final m = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$m:$s';
   }
 
-  Future<void> _showCreatePlaylistDialog() async {
+  Future<void> _showCreatePlaylistDialog(BuildContext context) async {
     final nameController = TextEditingController();
     final descriptionController = TextEditingController();
+    final playlistProvider = context.read<PlaylistProvider>();
 
     final result = await showDialog<bool>(
       context: context,
@@ -84,27 +71,20 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
     );
 
     if (result == true && nameController.text.isNotEmpty) {
-      try {
-        await _playlistService.createPlaylist(
-          nameController.text,
-          description: descriptionController.text.isEmpty 
-              ? null 
-              : descriptionController.text,
-        );
-        await _loadPlaylists();
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error creating playlist: $e')),
-          );
-        }
-      }
+      await playlistProvider.createPlaylist(
+        nameController.text,
+        description: descriptionController.text.isEmpty
+            ? null
+            : descriptionController.text,
+      );
     }
   }
 
-  Future<void> _deletePlaylist(Playlist playlist) async {
+  Future<void> _deletePlaylist(BuildContext context, Playlist playlist) async {
+    final contextBeforeAsync = context;
+  
     final confirmed = await showDialog<bool>(
-      context: context,
+      context: contextBeforeAsync,
       builder: (context) => AlertDialog(
         title: const Text('Delete Playlist'),
         content: Text('Delete "${playlist.name}"?'),
@@ -121,35 +101,28 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
       ),
     );
 
-    if (confirmed == true) {
-      try {
-        await _playlistService.deletePlaylist(playlist.id);
-        await _loadPlaylists();
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error deleting playlist: $e')),
-          );
-        }
-      }
+    if (contextBeforeAsync.mounted && confirmed == true) {
+      await contextBeforeAsync.read<PlaylistProvider>().deletePlaylist(playlist.id);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final playlistProvider = context.watch<PlaylistProvider>();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Playlists'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _loadPlaylists,
+            onPressed: () => playlistProvider.loadPlaylists(),
           ),
         ],
       ),
-      body: _isLoading
+      body: playlistProvider.isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _playlists.isEmpty
+          : playlistProvider.playlists.isEmpty
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -175,9 +148,9 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                   ),
                 )
               : ListView.builder(
-                  itemCount: _playlists.length,
+                  itemCount: playlistProvider.playlists.length,
                   itemBuilder: (context, index) {
-                    final playlist = _playlists[index];
+                    final playlist = playlistProvider.playlists[index];
                     return Card(
                       margin: const EdgeInsets.symmetric(
                         horizontal: 16,
@@ -206,29 +179,35 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                            Text('${playlist.songPaths.length} songs'),
+                            FutureBuilder<String>(
+                              future: _getPlaylistDuration(playlist),
+                              builder: (context, snapshot) {
+                                final duration = snapshot.data ?? '--:--';
+                                return Text('${playlist.songPaths.length} songs • $duration');
+                              },
+                            ),
                           ],
                         ),
                         trailing: IconButton(
                           icon: const Icon(Icons.delete),
-                          onPressed: () => _deletePlaylist(playlist),
+                          onPressed: () => _deletePlaylist(context, playlist),
                         ),
                         onTap: () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (context) => PlaylistDetailScreen(
-                                playlist: playlist,
+                                playlistId: playlist.id,
                               ),
                             ),
-                          ).then((_) => _loadPlaylists());
+                          ).then((_) => playlistProvider.loadPlaylists());
                         },
                       ),
                     );
                   },
                 ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showCreatePlaylistDialog,
+        onPressed: () => _showCreatePlaylistDialog(context),
         icon: const Icon(Icons.add),
         label: const Text('Create Playlist'),
       ),
