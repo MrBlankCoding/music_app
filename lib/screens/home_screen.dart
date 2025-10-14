@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'music_search_screen.dart';
 import 'library_screen.dart';
+import 'playlists_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -15,6 +16,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<Widget> _screens = [
     const MusicSearchScreen(),
     const LibraryScreen(),
+    const PlaylistsScreen(),
   ];
 
   @override
@@ -38,6 +40,11 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.library_music_outlined),
             selectedIcon: Icon(Icons.library_music),
             label: 'Library',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.playlist_play),
+            selectedIcon: Icon(Icons.playlist_play),
+            label: 'Playlists',
           ),
         ],
       ),
