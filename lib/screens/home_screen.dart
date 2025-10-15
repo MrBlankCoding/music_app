@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/music_player_provider.dart';
+import '../services/download_service.dart';
 import '../widgets/playback_bar.dart';
 import 'music_search_screen.dart';
 import 'library_screen.dart';
@@ -23,11 +24,34 @@ class _HomeScreenState extends State<HomeScreen> {
     const PlaylistsScreen(),
   ];
 
+  final List<String> _titles = [
+    'Search',
+    'Library',
+    'Playlists',
+  ];
+
   @override
   Widget build(BuildContext context) {
     final musicPlayerProvider = context.watch<MusicPlayerProvider>();
 
     return Scaffold(
+      appBar: AppBar(
+        title: Text(_titles[_selectedIndex]),
+        actions: [
+          Consumer<DownloadService>(
+            builder: (context, downloadService, child) {
+              if (downloadService.downloadQueue.isEmpty) {
+                return const SizedBox.shrink();
+              }
+              return Badge(
+                label: Text(downloadService.downloadQueue.length.toString()),
+                child: const Icon(Icons.download),
+              );
+            },
+          ),
+          const SizedBox(width: 16),
+        ],
+      ),
       body: _screens[_selectedIndex],
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
