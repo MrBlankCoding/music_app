@@ -86,6 +86,8 @@ class MusicPlayerProvider with ChangeNotifier {
       'path': 'https://www.youtube.com/watch?v=${v.videoId}',
       'name': v.title,
       'videoId': v.videoId,
+      'artist': v.channelTitle,
+      'thumbnailUrl': v.thumbnailUrl,
     }).toList();
     _currentVideo = video;
     _currentIndex = _playQueue.indexWhere((s) => s['videoId'] == video.videoId);

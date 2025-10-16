@@ -1,13 +1,14 @@
 import 'dart:collection';
 import 'dart:io';
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import '../models/youtube_video.dart';
 import 'dart:developer' as developer;
 import 'package:oktoast/oktoast.dart';
 import '../providers/library_provider.dart';
+import '../utils/metadata_utils.dart';
 
 class DownloadService with ChangeNotifier {
   static final DownloadService _instance = DownloadService._internal();
@@ -67,7 +68,7 @@ class DownloadService with ChangeNotifier {
       // Always show success toast
       showToast(
         "✓ Downloaded: ${video.title}",
-        position: ToastPosition.bottom,
+        position: const ToastPosition(align: Alignment.bottomCenter, offset: -72.0),
         duration: const Duration(seconds: 3),
       );
       
@@ -82,7 +83,7 @@ class DownloadService with ChangeNotifier {
       // Always show failure toast
       showToast(
         "✗ Download failed: ${video.title}",
-        position: ToastPosition.bottom,
+        position: const ToastPosition(align: Alignment.bottomCenter, offset: -72.0),
         duration: const Duration(seconds: 3),
       );
     } finally {
@@ -304,18 +305,48 @@ class DownloadService with ChangeNotifier {
             name: 'DownloadService');
       }
       
+      // Derive display name from filename
+      String fileDisplayName = file.path
+          .split('/')
+          .last
+          .replaceAll('.mp3', '')
+          .replaceAll('_', ' ');
+      fileDisplayName = MetadataUtils.decodeHtmlEntities(fileDisplayName).trim();
+
+      // Prefer artist from metadata; fallback to channel
+      String? artist = (metadata?['artist'] as String?)?.trim();
+      artist ??= (metadata?['channel'] as String?)?.trim();
+
+      // Prefer title from metadata
+      String? title = (metadata?['title'] as String?)?.trim();
+
+      // Decode HTML entities from metadata values
+      if (artist != null) artist = MetadataUtils.decodeHtmlEntities(artist).trim();
+      if (title != null) title = MetadataUtils.decodeHtmlEntities(title).trim();
+
+      // If artist missing, try to parse from filename pattern: "Artist - Title"
+      final parsed = MetadataUtils.extractArtistTitle(fileDisplayName);
+      if ((artist == null || artist.isEmpty) && parsed.artist != null) {
+        artist = parsed.artist;
+      }
+
+      // Decide on title -> clean/
+      final baseTitle = (title != null && title.isNotEmpty)
+          ? title
+          : (parsed.title ?? fileDisplayName);
+      final effectiveTitle = MetadataUtils.cleanTitle(
+        MetadataUtils.normalizeWhitespace(baseTitle),
+      );
+      final effectiveName = effectiveTitle; // what Library UI uses for display/sort
+
       return {
         'path': file.path,
-        'name': file.path
-            .split('/')
-            .last
-            .replaceAll('.mp3', '')
-            .replaceAll('_', ' '),
+        'name': effectiveName,
         'size': stat.size,
         'modified': stat.modified,
         'thumbnail_url': metadata?['thumbnail_url'],
-        'artist': metadata?['artist'] ?? metadata?['channel'],
-        'title': metadata?['title'],
+        'artist': artist,
+        'title': effectiveTitle,
         'video_id': metadata?['video_id'],
       };
     }));

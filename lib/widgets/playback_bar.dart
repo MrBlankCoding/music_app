@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -41,65 +40,57 @@ class PlaybackBar extends StatelessWidget {
   Widget build(BuildContext context) {
     if (currentSong == null) return const SizedBox.shrink();
 
+    final thumbUrl = currentSong!['thumbnailUrl'] ?? currentSong!['thumbnail_url'];
+    final artist = currentSong!['artist'] ?? '';
+    final theme = Theme.of(context);
+
     return Container(
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [
-              if (currentSong!['thumbnailUrl'] != null)
+              // Album art
+              if (thumbUrl != null)
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(6),
                   child: CachedNetworkImage(
-                    imageUrl: currentSong!['thumbnailUrl'],
-                    width: 48,
-                    height: 48,
+                    imageUrl: thumbUrl,
+                    width: 56,
+                    height: 56,
                     fit: BoxFit.cover,
                     placeholder: (context, url) => Container(
-                      width: 48,
-                      height: 48,
-                      color: Colors.grey[300],
-                      child: const Icon(Icons.music_note),
+                      width: 56,
+                      height: 56,
+                      color: theme.colorScheme.surfaceContainerHigh,
+                      child: Icon(
+                        Icons.music_note,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
                     errorWidget: (context, url, error) => Container(
-                      width: 48,
-                      height: 48,
-                      color: Colors.grey[300],
-                      child: const Icon(Icons.broken_image),
+                      width: 56,
+                      height: 56,
+                      color: theme.colorScheme.surfaceContainerHigh,
+                      child: Icon(
+                        Icons.broken_image,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
                 ),
-              const SizedBox(width: 8),
-              // Shuffle button
-              if (onShuffle != null)
-                IconButton(
-                  icon: Icon(
-                    Icons.shuffle,
-                    color: isShuffleEnabled
-                        ? Theme.of(context).colorScheme.primary
-                        : null,
-                  ),
-                  onPressed: onShuffle,
-                ),
-              // Previous button
-              if (onPrevious != null)
-                IconButton(
-                  icon: const Icon(Icons.skip_previous),
-                  onPressed: onPrevious,
-                ),
-              // Play/Pause button
-              IconButton(
-                icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow),
-                onPressed: onPlayPause,
-              ),
-              // Next button
-              if (onNext != null)
-                IconButton(
-                  icon: const Icon(Icons.skip_next),
-                  onPressed: onNext,
-                ),
+              const SizedBox(width: 16),
               // Song info
               Expanded(
                 child: Column(
@@ -110,28 +101,112 @@ class PlaybackBar extends StatelessWidget {
                       currentSong!['name'] ?? '',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
+                    const SizedBox(height: 2),
                     Text(
-                      '${_formatDuration(position)} / ${_formatDuration(duration)}',
-                      style: Theme.of(context).textTheme.bodySmall,
+                      artist,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
-                ), 
+                ),
               ),
-              // Stop button
-              IconButton(
-                icon: const Icon(Icons.stop),
-                onPressed: onStop,
+              const SizedBox(width: 8),
+              // Control buttons
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (onShuffle != null)
+                    IconButton(
+                      icon: Icon(Icons.shuffle),
+                      color: isShuffleEnabled
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurfaceVariant,
+                      onPressed: onShuffle,
+                      tooltip: 'Shuffle',
+                    ),
+                  if (onPrevious != null)
+                    IconButton(
+                      icon: const Icon(Icons.skip_previous),
+                      onPressed: onPrevious,
+                      tooltip: 'Previous',
+                    ),
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer,
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      icon: Icon(
+                        isPlaying ? Icons.pause : Icons.play_arrow,
+                        size: 28,
+                      ),
+                      color: theme.colorScheme.onPrimaryContainer,
+                      onPressed: onPlayPause,
+                      tooltip: isPlaying ? 'Pause' : 'Play',
+                    ),
+                  ),
+                  if (onNext != null)
+                    IconButton(
+                      icon: const Icon(Icons.skip_next),
+                      onPressed: onNext,
+                      tooltip: 'Next',
+                    ),
+                  IconButton(
+                    icon: const Icon(Icons.stop),
+                    onPressed: onStop,
+                    tooltip: 'Stop',
+                  ),
+                ],
               ),
             ],
           ),
-          Slider(
-            value: position.inSeconds.toDouble(),
-            max: duration.inSeconds > 0 ? duration.inSeconds.toDouble() : 1.0,
-            onChanged: (value) {
-              audioPlayer.seek(Duration(seconds: value.toInt()));
-            },
+          const SizedBox(height: 8),
+          // Progress bar with time labels
+          Row(
+            children: [
+              Text(
+                _formatDuration(position),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontVariations: [const FontVariation('wght', 500)],
+                ),
+              ),
+              Expanded(
+                child: SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    trackHeight: 3,
+                    thumbShape: const RoundSliderThumbShape(
+                      enabledThumbRadius: 6,
+                    ),
+                    overlayShape: const RoundSliderOverlayShape(
+                      overlayRadius: 14,
+                    ),
+                  ),
+                  child: Slider(
+                    value: position.inSeconds.toDouble(),
+                    max: duration.inSeconds > 0 ? duration.inSeconds.toDouble() : 1.0,
+                    onChanged: (value) {
+                      audioPlayer.seek(Duration(seconds: value.toInt()));
+                    },
+                  ),
+                ),
+              ),
+              Text(
+                _formatDuration(duration),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontVariations: [const FontVariation('wght', 500)],
+                ),
+              ),
+            ],
           ),
         ],
       ),
