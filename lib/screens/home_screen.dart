@@ -2,14 +2,18 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/music_player_provider.dart';
+import '../providers/library_provider.dart';
+import '../providers/playlist_provider.dart';
 import '../services/download_service.dart';
 import '../widgets/playback_bar.dart';
 import 'music_search_screen.dart';
 import 'library_screen.dart';
 import 'playlists_screen.dart';
+import 'download_queue_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final int initialIndex;
+  const HomeScreen({super.key, this.initialIndex = 0});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -17,6 +21,12 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedIndex = widget.initialIndex;
+  }
 
   final List<Widget> _screens = [
     const MusicSearchScreen(),
@@ -38,14 +48,51 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: Text(_titles[_selectedIndex]),
         actions: [
+          // Show sort menu when on Library tab
+          if (_selectedIndex == 1)
+            Consumer<LibraryProvider>(
+              builder: (context, libraryProvider, child) {
+                return PopupMenuButton<SortOrder>(
+                  onSelected: (sortOrder) => libraryProvider.setSortOrder(sortOrder),
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(value: SortOrder.dateNewest, child: Text('Date Added (Newest)')),
+                    PopupMenuItem(value: SortOrder.dateOldest, child: Text('Date Added (Oldest)')),
+                    PopupMenuItem(value: SortOrder.nameAz, child: Text('Name (A-Z)')),
+                    PopupMenuItem(value: SortOrder.nameZa, child: Text('Name (Z-A)')),
+                    PopupMenuItem(value: SortOrder.sizeLargest, child: Text('Size (Largest)')),
+                    PopupMenuItem(value: SortOrder.sizeSmallest, child: Text('Size (Smallest)')),
+                  ],
+                );
+              },
+            ),
+          // Show refresh button when on Playlists tab
+          if (_selectedIndex == 2)
+            Consumer<PlaylistProvider>(
+              builder: (context, playlistProvider, child) {
+                return IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: () => playlistProvider.loadPlaylists(),
+                );
+              },
+            ),
           Consumer<DownloadService>(
             builder: (context, downloadService, child) {
               if (downloadService.downloadQueue.isEmpty) {
                 return const SizedBox.shrink();
               }
-              return Badge(
-                label: Text(downloadService.downloadQueue.length.toString()),
-                child: const Icon(Icons.download),
+              return IconButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const DownloadQueueScreen(),
+                    ),
+                  );
+                },
+                icon: Badge(
+                  label: Text(downloadService.downloadQueue.length.toString()),
+                  child: const Icon(Icons.download),
+                ),
               );
             },
           ),

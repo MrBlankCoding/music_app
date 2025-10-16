@@ -1,58 +1,47 @@
 import 'dart:collection';
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import '../models/youtube_video.dart';
 import 'dart:developer' as developer;
+import 'package:oktoast/oktoast.dart';
+import '../providers/library_provider.dart';
 
 class DownloadService with ChangeNotifier {
   static final DownloadService _instance = DownloadService._internal();
   factory DownloadService() => _instance;
   DownloadService._internal();
 
-  String? _ytDlpPath;
+  LibraryProvider? _libraryProvider;
+  bool isQueueScreenVisible = false;
+
+  void setLibraryProvider(LibraryProvider libraryProvider) {
+    _libraryProvider = libraryProvider;
+  }
+
   String? _downloadDirectory;
+  final String _serverUrl = 'http://localhost:8000'; 
 
   final Queue<YouTubeVideo> _downloadQueue = Queue<YouTubeVideo>();
   final Map<String, double> _downloadProgress = {};
+  final Map<String, Map<String, dynamic>> _downloadDetails = {};
   bool _isDownloading = false;
 
   Queue<YouTubeVideo> get downloadQueue => _downloadQueue;
   Map<String, double> get downloadProgress => _downloadProgress;
+  Map<String, Map<String, dynamic>> get downloadDetails => _downloadDetails;
   bool get isDownloading => _isDownloading;
 
   Future<void> initialize() async {
     final appDocDir = await getApplicationDocumentsDirectory();
     _downloadDirectory = '${appDocDir.path}/MusicDownloads';
-    
     await Directory(_downloadDirectory!).create(recursive: true);
-    await _findYtDlp();
-  }
-
-  Future<void> _findYtDlp() async {
-    final envPath = Platform.environment['YTDLP_PATH'];
-    if (envPath != null && File(envPath).existsSync()) {
-      _ytDlpPath = envPath;
-      return;
-    }
-
-    final execDir = File(Platform.resolvedExecutable).parent.parent;
-    Directory dir = execDir;
-    for (int i = 0; i < 10; i++) {
-      final candidate = File('${dir.path}/binaries/yt-dlp');
-      if (candidate.existsSync()) {
-        _ytDlpPath = candidate.path;
-        return;
-      }
-      if (dir.parent.path == dir.path) break;
-      dir = dir.parent;
-    }
-
-    throw Exception('yt-dlp not found');
   }
 
   void addToQueue(YouTubeVideo video) {
-    if (_downloadQueue.any((v) => v.videoId == video.videoId) || 
+    if (_downloadQueue.any((v) => v.videoId == video.videoId) ||
         _downloadProgress.containsKey(video.videoId)) {
       return;
     }
@@ -66,17 +55,36 @@ class DownloadService with ChangeNotifier {
 
     _isDownloading = true;
     final video = _downloadQueue.first;
+    bool downloadSucceeded = false;
 
     try {
-      await downloadAudio(video, onProgress: (progress) {
-        _downloadProgress[video.videoId] = progress;
-        notifyListeners();
-      });
+      await downloadAudioWithProgress(video);
+      downloadSucceeded = true;
       _downloadQueue.removeFirst();
       _downloadProgress.remove(video.videoId);
+      _downloadDetails.remove(video.videoId);
+      
+      // Always show success toast
+      showToast(
+        "✓ Downloaded: ${video.title}",
+        position: ToastPosition.bottom,
+        duration: const Duration(seconds: 3),
+      );
+      
+      _libraryProvider?.loadSongs();
     } catch (e, s) {
-      developer.log('Download failed for ${video.title}', name: 'DownloadService', error: e, stackTrace: s);
+      developer.log('Download failed for ${video.title}',
+          name: 'DownloadService', error: e, stackTrace: s);
+      _downloadQueue.removeFirst();
       _downloadProgress.remove(video.videoId);
+      _downloadDetails.remove(video.videoId);
+      
+      // Always show failure toast
+      showToast(
+        "✗ Download failed: ${video.title}",
+        position: ToastPosition.bottom,
+        duration: const Duration(seconds: 3),
+      );
     } finally {
       _isDownloading = false;
       notifyListeners();
@@ -84,52 +92,186 @@ class DownloadService with ChangeNotifier {
     }
   }
 
-  Future<String> downloadAudio(YouTubeVideo video, {Function(double)? onProgress}) async {
-    if (_ytDlpPath == null) await initialize();
-    developer.log('Starting download for: ${video.title}', name: 'DownloadService');
+  Future<String> downloadAudioWithProgress(YouTubeVideo video) async {
+    if (_downloadDirectory == null) await initialize();
+    developer.log('Starting download for: ${video.title}',
+        name: 'DownloadService');
 
     final sanitizedTitle = video.title
         .replaceAll(RegExp(r'[^\w\s-]'), '')
         .replaceAll(RegExp(r'\s+'), '_');
+    final outputPath = '$_downloadDirectory/$sanitizedTitle.mp3';
+    final metadataPath = '$_downloadDirectory/$sanitizedTitle.json';
+    final file = File(outputPath);
     
-    final outputPath = '$_downloadDirectory/$sanitizedTitle.%(ext)s';
-
-    final process = await Process.start(_ytDlpPath!, [
-      '-x',
-      '--audio-format', 'mp3',
-      '--audio-quality', '0',
-      '-o', outputPath,
-      '--no-playlist',
-      'https://www.youtube.com/watch?v=${video.videoId}',
-    ]);
-
-    process.stdout.transform(const SystemEncoding().decoder).listen((data) {
-      developer.log('yt-dlp stdout: $data', name: 'DownloadService');
-      final match = RegExp(r'(\d+\.?\d*)%').firstMatch(data);
-      if (match != null) {
-        final progress = double.tryParse(match.group(1) ?? '0') ?? 0;
-        onProgress?.call(progress / 100);
+    // Fetch video metadata from server
+    Map<String, dynamic>? metadata;
+    try {
+      final metadataResponse = await http.get(
+        Uri.parse('$_serverUrl/video-info/${video.videoId}')
+      );
+      if (metadataResponse.statusCode == 200) {
+        metadata = json.decode(metadataResponse.body);
+        developer.log('Fetched metadata: $metadata', name: 'DownloadService');
       }
-    });
-    
-    process.stderr.transform(const SystemEncoding().decoder).listen((data) {
-      developer.log('yt-dlp stderr: $data', name: 'DownloadService');
-    });
-
-    final exitCode = await process.exitCode;
-    if (exitCode != 0) {
-      developer.log('yt-dlp process exited with code $exitCode', name: 'DownloadService');
-      throw Exception('Download failed');
+    } catch (e) {
+      developer.log('Error fetching metadata: $e', name: 'DownloadService');
     }
 
-    final file = File('$_downloadDirectory/$sanitizedTitle.mp3');
-    if (!await file.exists()) {
-      developer.log('File not found after download: ${file.path}', name: 'DownloadService');
-      throw Exception('File not found');
+    try {
+      final client = http.Client();
+      final request = http.Request(
+          'GET', Uri.parse('$_serverUrl/download-progress/${video.videoId}'));
+      
+      final response = await client.send(request);
+
+      if (response.statusCode != 200) {
+        throw Exception(
+            'Download failed: Server returned status ${response.statusCode}');
+      }
+
+      String buffer = '';
+      await for (var chunk in response.stream.transform(utf8.decoder)) {
+        buffer += chunk;
+        
+        // Process SSE messages
+        while (buffer.contains('\n\n')) {
+          final endIndex = buffer.indexOf('\n\n');
+          final message = buffer.substring(0, endIndex);
+          buffer = buffer.substring(endIndex + 2);
+          
+          if (message.startsWith('data: ')) {
+            final jsonStr = message.substring(6);
+            try {
+              final data = json.decode(jsonStr);
+              final status = data['status'];
+              
+              if (status == 'downloading') {
+                final totalBytes = data['total_bytes'] ?? 0;
+                final downloadedBytes = data['downloaded_bytes'] ?? 0;
+                
+                if (totalBytes > 0) {
+                  _downloadProgress[video.videoId] = downloadedBytes / totalBytes;
+                }
+                
+                _downloadDetails[video.videoId] = {
+                  'downloaded_bytes': downloadedBytes,
+                  'total_bytes': totalBytes,
+                  'speed': data['speed'] ?? 0,
+                  'eta': data['eta'] ?? 0,
+                  'percent': data['percent'] ?? '0%',
+                };
+                notifyListeners();
+              } else if (status == 'finished') {
+                _downloadProgress[video.videoId] = 1.0;
+                _downloadDetails[video.videoId] = {
+                  'status': 'converting',
+                };
+                notifyListeners();
+              } else if (status == 'completed') {
+                // Download completed, now download the file
+                final serverPath = data['path'];
+                developer.log('Download completed on server: $serverPath',
+                    name: 'DownloadService');
+                
+                // Now download the file from server
+                final fileUrl = '$_serverUrl/download/?video_id=${video.videoId}';
+                final fileResponse = await http.get(Uri.parse(fileUrl));
+                
+                if (fileResponse.statusCode == 200) {
+                  await file.writeAsBytes(fileResponse.bodyBytes);
+                  developer.log('File saved to: ${file.path}',
+                      name: 'DownloadService');
+                  
+                  // Save metadata JSON file
+                  if (metadata != null) {
+                    final metadataFile = File(metadataPath);
+                    await metadataFile.writeAsString(json.encode(metadata));
+                    developer.log('Metadata saved to: ${metadataFile.path}',
+                        name: 'DownloadService');
+                  }
+                  
+                  return file.path;
+                } else {
+                  throw Exception('Failed to download file from server');
+                }
+              } else if (status == 'error') {
+                throw Exception(data['message'] ?? 'Unknown error');
+              }
+            } catch (e) {
+              developer.log('Error parsing SSE data: $e',
+                  name: 'DownloadService');
+            }
+          }
+        }
+      }
+      
+      throw Exception('Stream ended unexpectedly');
+
+    } catch (e) {
+      developer.log('Error during download: $e', name: 'DownloadService');
+      // Clean up partially downloaded file
+      if (await file.exists()) {
+        await file.delete();
+      }
+      rethrow;
     }
-    
-    developer.log('Download complete: ${file.path}', name: 'DownloadService');
-    return file.path;
+  }
+
+  // Legacy method for backwards compatibility
+  Future<String> downloadAudio(YouTubeVideo video,
+      {Function(double)? onProgress}) async {
+    if (_downloadDirectory == null) await initialize();
+    developer.log('Starting download for: ${video.title}',
+        name: 'DownloadService');
+
+    final sanitizedTitle = video.title
+        .replaceAll(RegExp(r'[^\w\s-]'), '')
+        .replaceAll(RegExp(r'\s+'), '_');
+    final outputPath = '$_downloadDirectory/$sanitizedTitle.mp3';
+    final file = File(outputPath);
+
+    try {
+      final request = http.Request(
+          'POST', Uri.parse('$_serverUrl/download/?video_id=${video.videoId}'));
+      final response = await http.Client().send(request);
+
+      if (response.statusCode != 200) {
+        throw Exception(
+            'Download failed: Server returned status ${response.statusCode}');
+      }
+
+      final contentLength = response.contentLength;
+      int receivedBytes = 0;
+
+      final sink = file.openWrite();
+      await response.stream.listen((chunk) {
+        receivedBytes += chunk.length;
+        sink.add(chunk);
+        if (contentLength != null) {
+          final progress = receivedBytes / contentLength;
+          onProgress?.call(progress);
+        }
+      }).asFuture();
+
+      await sink.close();
+
+      if (!await file.exists() || await file.length() == 0) {
+         throw Exception('File not saved or is empty');
+      }
+
+      developer.log('Download complete: ${file.path}',
+          name: 'DownloadService');
+      return file.path;
+
+    } catch (e) {
+      developer.log('Error during download: $e', name: 'DownloadService');
+      // Clean up partially downloaded file
+      if (await file.exists()) {
+        await file.delete();
+      }
+      rethrow;
+    }
   }
 
   Future<List<Map<String, dynamic>>> getDownloadedSongs() async {
@@ -146,15 +288,40 @@ class DownloadService with ChangeNotifier {
 
     final songs = await Future.wait(files.map((file) async {
       final stat = await file.stat();
+      final baseName = file.path.replaceAll('.mp3', '');
+      final metadataPath = '$baseName.json';
+      
+      // Load metadata if exists
+      Map<String, dynamic>? metadata;
+      try {
+        final metadataFile = File(metadataPath);
+        if (await metadataFile.exists()) {
+          final metadataContent = await metadataFile.readAsString();
+          metadata = json.decode(metadataContent);
+        }
+      } catch (e) {
+        developer.log('Error loading metadata for ${file.path}: $e',
+            name: 'DownloadService');
+      }
+      
       return {
         'path': file.path,
-        'name': file.path.split('/').last.replaceAll('.mp3', '').replaceAll('_', ' '),
+        'name': file.path
+            .split('/')
+            .last
+            .replaceAll('.mp3', '')
+            .replaceAll('_', ' '),
         'size': stat.size,
         'modified': stat.modified,
+        'thumbnail_url': metadata?['thumbnail_url'],
+        'artist': metadata?['artist'] ?? metadata?['channel'],
+        'title': metadata?['title'],
+        'video_id': metadata?['video_id'],
       };
     }));
 
-    songs.sort((a, b) => (b['modified'] as DateTime).compareTo(a['modified'] as DateTime));
+    songs.sort((a, b) =>
+        (b['modified'] as DateTime).compareTo(a['modified'] as DateTime));
     return songs;
   }
 
@@ -172,3 +339,4 @@ class DownloadService with ChangeNotifier {
 
   String get downloadDirectory => _downloadDirectory ?? '';
 }
+

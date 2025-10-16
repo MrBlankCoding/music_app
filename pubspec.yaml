@@ -11,7 +11,7 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
-  http: ^1.1.0
+  http: ^1.5.0
   flutter_dotenv: ^6.0.0
   cached_network_image: ^3.3.0
   path_provider: ^2.1.1
@@ -19,6 +19,7 @@ dependencies:
   permission_handler: ^12.0.1
   provider: ^6.1.5+1
   google_fonts: ^6.3.2
+  oktoast: ^3.4.0
 
 dev_dependencies:
   flutter_test:
@@ -29,4 +30,3 @@ flutter:
   uses-material-design: true
   assets:
     - .env
-    - binaries/

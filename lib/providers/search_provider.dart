@@ -12,21 +12,31 @@ class SearchProvider with ChangeNotifier {
   List<YouTubeVideo> _videos = [];
   bool _isLoading = false;
   String _query = '';
+  final List<String> _recentSearches = [];
 
   // Getters
   List<YouTubeVideo> get videos => _videos;
   bool get isLoading => _isLoading;
   String get query => _query;
+  List<String> get recentSearches => List.unmodifiable(_recentSearches);
 
   Future<void> search(String query) async {
     if (query.trim().isEmpty) return;
 
-    _query = query;
+    // Record in recent history (dedupe, most-recent-first, max 5)
+    final q = query.trim();
+    _recentSearches.removeWhere((e) => e.toLowerCase() == q.toLowerCase());
+    _recentSearches.insert(0, q);
+    if (_recentSearches.length > 5) {
+      _recentSearches.removeRange(5, _recentSearches.length);
+    }
+
+    _query = q;
     _isLoading = true;
     notifyListeners();
 
     try {
-      _videos = await _youtubeService.searchVideos(query);
+      _videos = await _youtubeService.searchVideos(q);
     } catch (e) {
       // Handle error
     } finally {
@@ -38,6 +48,11 @@ class SearchProvider with ChangeNotifier {
   void clearSearch() {
     _videos = [];
     _query = '';
+    notifyListeners();
+  }
+
+  void clearRecentSearches() {
+    _recentSearches.clear();
     notifyListeners();
   }
 }

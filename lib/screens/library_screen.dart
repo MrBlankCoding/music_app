@@ -7,6 +7,7 @@ import '../providers/library_provider.dart';
 import '../providers/music_player_provider.dart';
 import '../providers/playlist_provider.dart';
 import '../models/playlist.dart';
+import '../widgets/song_card.dart';
 
 class LibraryScreen extends StatelessWidget {
   const LibraryScreen({super.key});
@@ -200,6 +201,7 @@ class LibraryScreen extends StatelessWidget {
         await musicPlayerProvider.stop();
       }
       await libraryProvider.deleteSong(song['path']);
+      await libraryProvider.loadSongs();
     }
   }
 
@@ -226,28 +228,7 @@ class LibraryScreen extends StatelessWidget {
     final libraryProvider = context.watch<LibraryProvider>();
     final musicPlayerProvider = context.watch<MusicPlayerProvider>();
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Library'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => libraryProvider.loadSongs(),
-          ),
-          PopupMenuButton<SortOrder>(
-            onSelected: (sortOrder) => libraryProvider.setSortOrder(sortOrder),
-            itemBuilder: (context) => const [
-              PopupMenuItem(value: SortOrder.dateNewest, child: Text('Date Added (Newest)')),
-              PopupMenuItem(value: SortOrder.dateOldest, child: Text('Date Added (Oldest)')),
-              PopupMenuItem(value: SortOrder.nameAz, child: Text('Name (A-Z)')),
-              PopupMenuItem(value: SortOrder.nameZa, child: Text('Name (Z-A)')),
-              PopupMenuItem(value: SortOrder.sizeLargest, child: Text('Size (Largest)')),
-              PopupMenuItem(value: SortOrder.sizeSmallest, child: Text('Size (Smallest)')),
-            ],
-          ),
-        ],
-      ),
-      body: Column(
+    return Column(
         children: [
           Padding(
             padding: const EdgeInsets.all(16.0),
@@ -267,53 +248,19 @@ class LibraryScreen extends StatelessWidget {
                     ? const Center(child: Text('No songs'))
                     : ListView.builder(
                         padding: EdgeInsets.only(
-                          bottom: musicPlayerProvider.currentlyPlayingPath != null ? 120 : 0,
+                          top: 8,
+                          left: 12,
+                          right: 12,
+                          bottom: musicPlayerProvider.currentlyPlayingPath != null ? 120 : 20,
                         ),
                         itemCount: libraryProvider.songs.length,
                         itemBuilder: (context, index) {
                           final song = libraryProvider.songs[index];
                           final isPlaying = musicPlayerProvider.currentlyPlayingPath == song['path'];
-                          return ListTile(
-                            leading: Icon(
-                              isPlaying && musicPlayerProvider.isPlaying
-                                  ? Icons.graphic_eq
-                                  : Icons.music_note,
-                            ),
-                            title: Text(song['name']),
-                            subtitle: FutureBuilder<String>(
-                              future: _getSongDuration(song['path']),
-                              builder: (context, snapshot) {
-                                final duration = snapshot.data ?? '--:--';
-                                return Text('$duration - ${_formatBytes(song['size'])}');
-                              },
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: Icon(
-                                    isPlaying && musicPlayerProvider.isPlaying
-                                        ? Icons.pause
-                                        : Icons.play_arrow,
-                                  ),
-                                  onPressed: () {
-                                    if (musicPlayerProvider.currentlyPlayingPath != song['path']) {
-                                      musicPlayerProvider.setQueue(libraryProvider.songs, initialIndex: index);
-                                    } else {
-                                      musicPlayerProvider.playSong(song['path']);
-                                    }
-                                  },
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.playlist_add),
-                                  onPressed: () => _showAddToPlaylistDialog(context, song),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete),
-                                  onPressed: () => _deleteSong(context, song),
-                                ),
-                              ],
-                            ),
+                          
+                          return SongCard(
+                            song: song,
+                            isPlaying: isPlaying && musicPlayerProvider.isPlaying,
                             onTap: () {
                               if (musicPlayerProvider.currentlyPlayingPath != song['path']) {
                                 musicPlayerProvider.setQueue(libraryProvider.songs, initialIndex: index);
@@ -321,12 +268,56 @@ class LibraryScreen extends StatelessWidget {
                                 musicPlayerProvider.playSong(song['path']);
                               }
                             },
+                            onPlay: () {
+                              if (musicPlayerProvider.currentlyPlayingPath != song['path']) {
+                                musicPlayerProvider.setQueue(libraryProvider.songs, initialIndex: index);
+                              } else {
+                                musicPlayerProvider.playSong(song['path']);
+                              }
+                            },
+                            menuItems: [
+                              PopupMenuItem<String>(
+                                value: 'add_to_playlist',
+                                child: ListTile(
+                                  leading: const Icon(Icons.playlist_add),
+                                  title: const Text('Add to Playlist'),
+                                  contentPadding: EdgeInsets.zero,
+                                ),
+                                onTap: () {
+                                  Future.delayed(
+                                    const Duration(milliseconds: 100),
+                                    () => _showAddToPlaylistDialog(context, song),
+                                  );
+                                },
+                              ),
+                              PopupMenuItem<String>(
+                                value: 'delete',
+                                child: ListTile(
+                                  leading: Icon(
+                                    Icons.delete,
+                                    color: Theme.of(context).colorScheme.error,
+                                  ),
+                                  title: Text(
+                                    'Delete',
+                                    style: TextStyle(
+                                      color: Theme.of(context).colorScheme.error,
+                                    ),
+                                  ),
+                                  contentPadding: EdgeInsets.zero,
+                                ),
+                                onTap: () {
+                                  Future.delayed(
+                                    const Duration(milliseconds: 100),
+                                    () => _deleteSong(context, song),
+                                  );
+                                },
+                              ),
+                            ],
                           );
                         },
                       ),
           ),
         ],
-      ),
-    );
+      );
   }
 }
