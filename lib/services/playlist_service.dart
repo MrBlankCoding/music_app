@@ -107,4 +107,20 @@ class PlaylistService {
       return null;
     }
   }
+
+  Future<void> removeSongFromAllPlaylists(String songPath) async {
+    bool modified = false;
+    for (int i = 0; i < _playlists.length; i++) {
+      final playlist = _playlists[i];
+      if (playlist.songPaths.contains(songPath)) {
+        _playlists[i] = playlist.copyWith(
+          songPaths: playlist.songPaths.where((p) => p != songPath).toList(),
+        );
+        modified = true;
+      }
+    }
+    if (modified) {
+      await _savePlaylists();
+    }
+  }
 }

@@ -1,5 +1,6 @@
 
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -73,14 +74,25 @@ class MusicPlayerProvider with ChangeNotifier {
     });
   }
 
-  void setQueue(List<Map<String, dynamic>> songs, {int initialIndex = 0}) {
-    _playQueue = List.from(songs);
+  Future<void> setQueue(List<Map<String, dynamic>> songs, {int initialIndex = 0}) async {
+    // Filter out invalid songs before setting the queue
+    final validSongs = <Map<String, dynamic>>[];
+    for (final song in songs) {
+      if (await _isValidSong(song['path'])) {
+        validSongs.add(song);
+      }
+    }
+    
+    _playQueue = validSongs;
     if (_isShuffleEnabled) {
       _playQueue.shuffle(Random());
     }
-    _currentIndex = initialIndex;
+    
+    // Adjust initial index if needed
+    _currentIndex = initialIndex < _playQueue.length ? initialIndex : 0;
+    
     if (_playQueue.isNotEmpty) {
-      playSong(_playQueue[_currentIndex]['path']);
+      await playSong(_playQueue[_currentIndex]['path']);
     }
     notifyListeners();
   }
@@ -152,20 +164,81 @@ class MusicPlayerProvider with ChangeNotifier {
     }
   }
 
+  Future<bool> _isValidSong(String path) async {
+    if (path.startsWith('http')) return true;
+    try {
+      final file = File(path);
+      return await file.exists();
+    } catch (e) {
+      return false;
+    }
+  }
+
   Future<void> playNext() async {
     if (_playQueue.isEmpty) return;
     
-    final nextIndex = (_currentIndex + 1) % _playQueue.length;
-    final nextSong = _playQueue[nextIndex];
-    await playSong(nextSong['path']);
+    int attempts = 0;
+    int nextIndex = (_currentIndex + 1) % _playQueue.length;
+    
+    // Try to find a valid song, up to the queue length
+    while (attempts < _playQueue.length) {
+      final nextSong = _playQueue[nextIndex];
+      final isValid = await _isValidSong(nextSong['path']);
+      
+      if (isValid) {
+        await playSong(nextSong['path']);
+        return;
+      }
+      
+      // Remove invalid song from queue
+      _playQueue.removeAt(nextIndex);
+      if (_playQueue.isEmpty) {
+        await stop();
+        return;
+      }
+      
+      // Adjust index after removal
+      nextIndex = nextIndex % _playQueue.length;
+      attempts++;
+    }
+    
+    // No valid songs found
+    await stop();
   }
 
   Future<void> playPrevious() async {
     if (_playQueue.isEmpty) return;
     
-    final prevIndex = _currentIndex <= 0 ? _playQueue.length - 1 : _currentIndex - 1;
-    final prevSong = _playQueue[prevIndex];
-    await playSong(prevSong['path']);
+    int attempts = 0;
+    int prevIndex = _currentIndex <= 0 ? _playQueue.length - 1 : _currentIndex - 1;
+    
+    // Try to find a valid song, up to the queue length
+    while (attempts < _playQueue.length) {
+      final prevSong = _playQueue[prevIndex];
+      final isValid = await _isValidSong(prevSong['path']);
+      
+      if (isValid) {
+        await playSong(prevSong['path']);
+        return;
+      }
+      
+      // Remove invalid song from queue
+      _playQueue.removeAt(prevIndex);
+      if (_playQueue.isEmpty) {
+        await stop();
+        return;
+      }
+      
+      // Adjust index after removal
+      if (prevIndex >= _playQueue.length) {
+        prevIndex = _playQueue.length - 1;
+      }
+      prevIndex = prevIndex <= 0 ? _playQueue.length - 1 : prevIndex - 1;
+      attempts++;
+    }
+    
+    // No valid songs found
+    await stop();
   }
 
   Future<void> stop() async {

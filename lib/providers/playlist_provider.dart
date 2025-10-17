@@ -100,4 +100,13 @@ class PlaylistProvider with ChangeNotifier {
       // Handle error
     }
   }
+
+  Future<void> removeSongFromAllPlaylists(String songPath) async {
+    try {
+      await _playlistService.removeSongFromAllPlaylists(songPath);
+      await loadPlaylists();
+    } catch (e) {
+      // Handle error
+    }
+  }
 }

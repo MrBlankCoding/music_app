@@ -179,7 +179,7 @@ class LibraryScreen extends StatelessWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Song'),
-        content: Text('Delete "${song['name']}"?'),
+        content: const Text('Are you sure you want to delete this song? This action cannot be undone.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -193,14 +193,15 @@ class LibraryScreen extends StatelessWidget {
       ),
     );
 
-    if (confirmed == true) {
-      if (!context.mounted) return;
+    if (confirmed == true && context.mounted) {
       final musicPlayerProvider = context.read<MusicPlayerProvider>();
       final libraryProvider = context.read<LibraryProvider>();
+      final playlistProvider = context.read<PlaylistProvider>();
       if (musicPlayerProvider.currentlyPlayingPath == song['path']) {
         await musicPlayerProvider.stop();
       }
       await libraryProvider.deleteSong(song['path']);
+      await playlistProvider.removeSongFromAllPlaylists(song['path']);
       await libraryProvider.loadSongs();
     }
   }
@@ -261,18 +262,18 @@ class LibraryScreen extends StatelessWidget {
                           return SongCard(
                             song: song,
                             isPlaying: isPlaying && musicPlayerProvider.isPlaying,
-                            onTap: () {
+                            onTap: () async {
                               if (musicPlayerProvider.currentlyPlayingPath != song['path']) {
-                                musicPlayerProvider.setQueue(libraryProvider.songs, initialIndex: index);
+                                await musicPlayerProvider.setQueue(libraryProvider.songs, initialIndex: index);
                               } else {
-                                musicPlayerProvider.playSong(song['path']);
+                                await musicPlayerProvider.playSong(song['path']);
                               }
                             },
-                            onPlay: () {
+                            onPlay: () async {
                               if (musicPlayerProvider.currentlyPlayingPath != song['path']) {
-                                musicPlayerProvider.setQueue(libraryProvider.songs, initialIndex: index);
+                                await musicPlayerProvider.setQueue(libraryProvider.songs, initialIndex: index);
                               } else {
-                                musicPlayerProvider.playSong(song['path']);
+                                await musicPlayerProvider.playSong(song['path']);
                               }
                             },
                             menuItems: [

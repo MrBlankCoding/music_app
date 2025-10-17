@@ -122,16 +122,16 @@ class PlaylistDetailScreen extends StatelessWidget {
     }).whereType<Map<String, dynamic>>().toList();
   }
 
-  void _handleSongTap(
+  Future<void> _handleSongTap(
     MusicPlayerProvider musicPlayerProvider,
     Map<String, dynamic> song,
     List<Map<String, dynamic>> songs,
     int index,
-  ) {
+  ) async {
     if (musicPlayerProvider.currentlyPlayingPath != song['path']) {
-      musicPlayerProvider.setQueue(songs, initialIndex: index);
+      await musicPlayerProvider.setQueue(songs, initialIndex: index);
     } else {
-      musicPlayerProvider.playSong(song['path'] as String);
+      await musicPlayerProvider.playSong(song['path'] as String);
     }
   }
 
