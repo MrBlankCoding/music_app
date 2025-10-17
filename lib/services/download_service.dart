@@ -23,7 +23,7 @@ class DownloadService with ChangeNotifier {
   }
 
   String? _downloadDirectory;
-  final String _serverUrl = 'https://hurt-denni-mrblankcoding-605d0a56.koyeb.app';
+  final String _serverUrl = 'https://downloadapi-production-6d65.up.railway.app';
   // http://127.0.0.1:8000
   // https://hurt-denni-mrblankcoding-605d0a56.koyeb.app
   final Queue<YouTubeVideo> _downloadQueue = Queue<YouTubeVideo>();
@@ -168,6 +168,14 @@ class DownloadService with ChangeNotifier {
                 _downloadProgress[video.videoId] = 1.0;
                 _downloadDetails[video.videoId] = {
                   'status': 'converting',
+                };
+                notifyListeners();
+              } else if (status == 'converting') {
+                // Server is converting the file
+                _downloadProgress[video.videoId] = 1.0;
+                _downloadDetails[video.videoId] = {
+                  'status': 'converting',
+                  'elapsed': data['elapsed'] ?? 0,
                 };
                 notifyListeners();
               } else if (status == 'completed') {
