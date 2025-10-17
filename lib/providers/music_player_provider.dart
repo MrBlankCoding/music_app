@@ -60,6 +60,28 @@ class MusicPlayerProvider with ChangeNotifier {
   }
   List<Map<String, dynamic>> get playQueue => _playQueue;
 
+  String? _computeArtUri(Map<String, dynamic> song) {
+    final dynamic t = song['thumbnailUrl'] ?? song['thumbnail_url'];
+    String? thumb = t is String && t.isNotEmpty ? t : null;
+    final String? videoId = (song['videoId'] ?? song['video_id']) as String?;
+
+    // Prefer stable YouTube JPG thumbnails to avoid 404s from webp/maxres
+    if (videoId != null && videoId.isNotEmpty) {
+      return 'https://i.ytimg.com/vi/$videoId/hqdefault.jpg';
+    }
+
+    if (thumb != null) {
+      if (thumb.contains('i.ytimg.com')) {
+        thumb = thumb
+            .replaceAll('vi_webp', 'vi')
+            .replaceAll('maxresdefault.webp', 'hqdefault.jpg')
+            .replaceAll('.webp', '.jpg');
+      }
+      return thumb;
+    }
+    return null;
+  }
+
   void _setupAudioPlayer() {
     _positionSubscription = _audioPlayer.positionStream.listen((position) {
       _position = position;
@@ -117,12 +139,12 @@ class MusicPlayerProvider with ChangeNotifier {
 
       final sources = _playQueue.map((song) {
         final path = song['path'] as String;
-        final thumb = (song['thumbnailUrl'] ?? song['thumbnail_url']);
+        final resolvedThumb = _computeArtUri(song);
         final tag = MediaItem(
           id: path,
           title: (song['name'] ?? song['title'] ?? 'Unknown') as String,
           artist: (song['artist'] ?? 'Unknown Artist') as String,
-          artUri: thumb != null ? Uri.parse(thumb) : null,
+          artUri: resolvedThumb != null ? Uri.parse(resolvedThumb) : null,
         );
         final uri = path.startsWith('http') ? Uri.parse(path) : Uri.file(path);
         return AudioSource.uri(uri, tag: tag);
@@ -190,7 +212,7 @@ class MusicPlayerProvider with ChangeNotifier {
         print('Song not in queue, adding it');
         _playQueue.add({'path': path, 'name': path.split('/').last});
         final song = _playQueue.lastWhere((s) => s['path'] == path, orElse: () => {'name': path.split('/').last});
-        final thumb = (song['thumbnailUrl'] ?? song['thumbnail_url']);
+        final resolvedThumb = _computeArtUri(song);
         final artist = (song['artist'] ?? 'Unknown Artist') as String;
         final source = AudioSource.uri(
           path.startsWith('http') ? Uri.parse(path) : Uri.file(path),
@@ -198,7 +220,7 @@ class MusicPlayerProvider with ChangeNotifier {
             id: path,
             title: (song['name'] ?? path.split('/').last) as String,
             artist: artist,
-            artUri: thumb != null ? Uri.parse(thumb) : null,
+            artUri: resolvedThumb != null ? Uri.parse(resolvedThumb) : null,
           ),
         );
         // Append to current playlist if exists
