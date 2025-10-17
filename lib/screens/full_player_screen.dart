@@ -122,37 +122,53 @@ class FullPlayerScreen extends StatelessWidget {
   }
 
   Widget _buildProgressBar(BuildContext context, ThemeData theme) {
-    return Column(
-      children: [
-        SliderTheme(
-          data: SliderTheme.of(context).copyWith(
-            trackHeight: 4,
-            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
-            overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
-          ),
-          child: Slider(
-            value: position.inSeconds.toDouble(),
-            max: duration.inSeconds > 0 ? duration.inSeconds.toDouble() : 1.0,
-            onChanged: (value) => audioPlayer.seek(Duration(seconds: value.toInt())),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                _formatDuration(position),
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-              ),
-              Text(
-                _formatDuration(duration),
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-              ),
-            ],
-          ),
-        ),
-      ],
+    return StreamBuilder<Duration>(
+      stream: audioPlayer.onDurationChanged,
+      initialData: duration,
+      builder: (context, durationSnap) {
+        final d = durationSnap.data ?? Duration.zero;
+        final maxSeconds = d.inSeconds > 0 ? d.inSeconds.toDouble() : 1.0;
+        return StreamBuilder<Duration>(
+          stream: audioPlayer.onPositionChanged,
+          initialData: position,
+          builder: (context, positionSnap) {
+            final p = positionSnap.data ?? Duration.zero;
+            final valueSeconds = p.inSeconds.clamp(0, d.inSeconds).toDouble();
+            return Column(
+              children: [
+                SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    trackHeight: 4,
+                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+                  ),
+                  child: Slider(
+                    value: valueSeconds,
+                    max: maxSeconds,
+                    onChanged: (value) => audioPlayer.seek(Duration(seconds: value.toInt())),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        _formatDuration(p),
+                        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                      ),
+                      Text(
+                        _formatDuration(d),
+                        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 

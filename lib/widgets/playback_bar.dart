@@ -73,6 +73,14 @@ class _PlaybackBarState extends State<PlaybackBar> {
     return '$m:$s';
   }
 
+  void _seekToDx(double width, double dx) {
+    final totalMs = widget.duration.inMilliseconds;
+    if (totalMs <= 0) return;
+    final fraction = (dx / width).clamp(0.0, 1.0);
+    final targetMs = (totalMs * fraction).round();
+    widget.audioPlayer.seek(Duration(milliseconds: targetMs));
+  }
+
   @override
   Widget build(BuildContext context) {
     if (widget.currentSong == null) return const SizedBox.shrink();
@@ -161,48 +169,57 @@ class _PlaybackBarState extends State<PlaybackBar> {
                   final filledWidth = width * progress;
                   final dotLeft = (filledWidth - (dotSize / 2)).clamp(0.0, width - dotSize);
 
-                  return Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      // Background bar
-                      Container(
-                        height: barHeight,
-                        width: width,
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.surfaceContainerHigh,
-                          borderRadius: BorderRadius.circular(barHeight / 2),
-                        ),
-                      ),
-                      // Filled progress
-                      Container(
-                        height: barHeight,
-                        width: filledWidth,
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primary,
-                          borderRadius: BorderRadius.circular(barHeight / 2),
-                        ),
-                      ),
-                      // Position dot
-                      Positioned(
-                        left: dotLeft,
-                        top: -(dotSize - barHeight) / 2,
-                        child: Container(
-                          width: dotSize,
-                          height: dotSize,
+                  return GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onTapDown: (details) {
+                      _seekToDx(width, details.localPosition.dx);
+                    },
+                    onHorizontalDragUpdate: (details) {
+                      _seekToDx(width, details.localPosition.dx);
+                    },
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        // Background bar
+                        Container(
+                          height: barHeight,
+                          width: width,
                           decoration: BoxDecoration(
-                            color: theme.colorScheme.primary,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: theme.colorScheme.primary.withOpacity(0.3),
-                                blurRadius: 6,
-                                spreadRadius: 0,
-                              ),
-                            ],
+                            color: theme.colorScheme.surfaceContainerHigh,
+                            borderRadius: BorderRadius.circular(barHeight / 2),
                           ),
                         ),
-                      ),
-                    ],
+                        // Filled progress
+                        Container(
+                          height: barHeight,
+                          width: filledWidth,
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primary,
+                            borderRadius: BorderRadius.circular(barHeight / 2),
+                          ),
+                        ),
+                        // Position dot
+                        Positioned(
+                          left: dotLeft,
+                          top: -(dotSize - barHeight) / 2,
+                          child: Container(
+                            width: dotSize,
+                            height: dotSize,
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primary,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: theme.colorScheme.primary.withOpacity(0.3),
+                                  blurRadius: 6,
+                                  spreadRadius: 0,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   );
                 },
               ),
