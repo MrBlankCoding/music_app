@@ -113,7 +113,7 @@ class PlaylistsScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Create a playlist to get started',
+                        'Make a playlist!',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               color: Colors.grey[600],
                             ),
@@ -297,7 +297,7 @@ class _PlaylistCard extends StatelessWidget {
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) {
                   return Container(
-                    color: Theme.of(context).colorScheme.surfaceVariant,
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
                     child: Icon(
                       Icons.music_note,
                       size: 16,
@@ -308,7 +308,7 @@ class _PlaylistCard extends StatelessWidget {
               );
             }
             return Container(
-              color: Theme.of(context).colorScheme.surfaceVariant,
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
               child: Icon(
                 Icons.music_note,
                 size: 16,

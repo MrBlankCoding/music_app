@@ -243,7 +243,7 @@ class PlaylistDetailScreen extends StatelessWidget {
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) {
                   return Container(
-                    color: Theme.of(context).colorScheme.surfaceVariant,
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
                     child: Icon(
                       Icons.music_note,
                       size: 24,
@@ -254,7 +254,7 @@ class PlaylistDetailScreen extends StatelessWidget {
               );
             }
             return Container(
-              color: Theme.of(context).colorScheme.surfaceVariant,
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
               child: Icon(
                 Icons.music_note,
                 size: 24,

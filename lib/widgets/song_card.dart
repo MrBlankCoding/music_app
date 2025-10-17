@@ -83,7 +83,7 @@ class SongCard extends StatelessWidget {
                   height: showDragHandle ? 56 : 64,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(8),
-                    color: Theme.of(context).colorScheme.surfaceVariant,
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withOpacity(0.1),

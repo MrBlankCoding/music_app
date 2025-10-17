@@ -10,20 +10,20 @@ class DownloadQueueScreen extends StatefulWidget {
 }
 
 class _DownloadQueueScreenState extends State<DownloadQueueScreen> {
+  late DownloadService _downloadService;
   @override
   void initState() {
     super.initState();
+    _downloadService = context.read<DownloadService>();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final downloadService = context.read<DownloadService>();
-      downloadService.isQueueScreenVisible = true;
+      _downloadService.isQueueScreenVisible = true;
     });
   }
 
   @override
   void dispose() {
-    final downloadService = context.read<DownloadService>();
-    downloadService.isQueueScreenVisible = false;
+    _downloadService.isQueueScreenVisible = false;
     super.dispose();
   }
 

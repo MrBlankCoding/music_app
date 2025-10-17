@@ -99,47 +99,51 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(width: 16),
         ],
       ),
-      body: _screens[_selectedIndex],
-      bottomNavigationBar: Column(
-        mainAxisSize: MainAxisSize.min,
+      body: Stack(
         children: [
-          PlaybackBar(
-            audioPlayer: musicPlayerProvider.audioPlayer,
-            currentSong: musicPlayerProvider.currentSong,
-            isPlaying: musicPlayerProvider.isPlaying,
-            position: musicPlayerProvider.position,
-            duration: musicPlayerProvider.duration,
-            onPlayPause: () => musicPlayerProvider.playSong(musicPlayerProvider.currentlyPlayingPath!),
-            onStop: musicPlayerProvider.stop,
-            onNext: musicPlayerProvider.playQueue.length > 1 ? musicPlayerProvider.playNext : null,
-            onPrevious: musicPlayerProvider.playQueue.length > 1 ? musicPlayerProvider.playPrevious : null,
-            onShuffle: musicPlayerProvider.playQueue.length > 1 ? musicPlayerProvider.toggleShuffle : null,
-            isShuffleEnabled: musicPlayerProvider.isShuffleEnabled,
+          _screens[_selectedIndex],
+          // Overlay the playback bar on top of the body content, pinned to bottom
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: PlaybackBar(
+              audioPlayer: musicPlayerProvider.audioPlayer,
+              currentSong: musicPlayerProvider.currentSong,
+              isPlaying: musicPlayerProvider.isPlaying,
+              position: musicPlayerProvider.position,
+              duration: musicPlayerProvider.duration,
+              onPlayPause: () => musicPlayerProvider.playSong(musicPlayerProvider.currentlyPlayingPath!),
+              onStop: musicPlayerProvider.stop,
+              onNext: musicPlayerProvider.playQueue.length > 1 ? musicPlayerProvider.playNext : null,
+              onPrevious: musicPlayerProvider.playQueue.length > 1 ? musicPlayerProvider.playPrevious : null,
+              onShuffle: musicPlayerProvider.playQueue.length > 1 ? musicPlayerProvider.toggleShuffle : null,
+              isShuffleEnabled: musicPlayerProvider.isShuffleEnabled,
+              bottomPadding: 80, // keep minimized bar above NavigationBar
+            ),
           ),
-          NavigationBar(
-            selectedIndex: _selectedIndex,
-            onDestinationSelected: (index) {
-              setState(() {
-                _selectedIndex = index;
-              });
-            },
-            destinations: const [
-              NavigationDestination(
-                icon: Icon(Icons.search),
-                selectedIcon: Icon(Icons.search),
-                label: 'Search',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.library_music_outlined),
-                selectedIcon: Icon(Icons.library_music),
-                label: 'Library',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.playlist_play),
-                selectedIcon: Icon(Icons.playlist_play),
-                label: 'Playlists',
-              ),
-            ],
+        ],
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _selectedIndex,
+        onDestinationSelected: (index) {
+          setState(() {
+            _selectedIndex = index;
+          });
+        },
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.search),
+            selectedIcon: Icon(Icons.search),
+            label: 'Search',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.library_music_outlined),
+            selectedIcon: Icon(Icons.library_music),
+            label: 'Library',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.playlist_play),
+            selectedIcon: Icon(Icons.playlist_play),
+            label: 'Playlists',
           ),
         ],
       ),

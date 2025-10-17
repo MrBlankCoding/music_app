@@ -38,8 +38,12 @@ class MusicPlayerProvider with ChangeNotifier {
     if (_currentlyPlayingPath == null) return null;
     try {
       final song = _playQueue.firstWhere((s) => s['path'] == _currentlyPlayingPath);
-      if (_currentVideo != null && song['videoId'] == _currentVideo!.videoId) {
-        song['thumbnailUrl'] = _currentVideo!.thumbnailUrl;
+      if (_currentVideo != null) {
+        final vidCamel = song['videoId'];
+        final vidSnake = song['video_id'];
+        if (vidCamel == _currentVideo!.videoId || vidSnake == _currentVideo!.videoId) {
+          song['thumbnailUrl'] = _currentVideo!.thumbnailUrl;
+        }
       }
       return song;
     } catch (e) {
@@ -102,7 +106,7 @@ class MusicPlayerProvider with ChangeNotifier {
         _currentIndex = _playQueue.indexWhere((s) => s['path'] == _currentlyPlayingPath);
       }
     } else {
-      // Revert to original order if possible, for now just re-set from a source
+      _playQueue = _playQueue;
     }
     notifyListeners();
   }
@@ -111,26 +115,40 @@ class MusicPlayerProvider with ChangeNotifier {
     try {
       if (_currentlyPlayingPath == path && _isPlaying) {
         await _audioPlayer.pause();
+        notifyListeners();
+        return;
       } else if (_currentlyPlayingPath == path && !_isPlaying) {
         await _audioPlayer.resume();
-      } else {
-        if (path.startsWith('http')) {
-          await _audioPlayer.play(UrlSource(path));
-        } else {
-          await _audioPlayer.play(DeviceFileSource(path));
-        }
-        _currentlyPlayingPath = path;
-        _currentIndex = _playQueue.indexWhere((s) => s['path'] == path);
-        if (_playQueue[_currentIndex].containsKey('videoId')) {
-          // This is a youtube video, but we don't have the full object here.
-          // This is a limitation of the current implementation.
-        } else {
-          _currentVideo = null;
-        }
+        notifyListeners();
+        return;
       }
+
+      _currentlyPlayingPath = path;
+      _currentIndex = _playQueue.indexWhere((s) => s['path'] == path);
+      if (_currentIndex < 0) {
+        _playQueue.add({'path': path, 'name': path.split('/').last});
+        _currentIndex = _playQueue.length - 1;
+      }
+      _currentVideo = _playQueue[_currentIndex].containsKey('videoId') || _playQueue[_currentIndex].containsKey('video_id')
+          ? _currentVideo
+          : null;
       notifyListeners();
+
+      if (path.startsWith('http')) {
+        await _audioPlayer.play(UrlSource(path));
+      } else {
+        await _audioPlayer.play(DeviceFileSource(path));
+      }
     } catch (e) {
-      // Handle error
+      // On failure, revert UI state
+      _isPlaying = false;
+      // keep _currentlyPlayingPath so user still sees the bar briefly if desired,
+      // or clear it to hide the bar if playback failed. Choose to clear to avoid stale UI.
+      _currentlyPlayingPath = null;
+      _currentIndex = -1;
+      _currentVideo = null;
+    } finally {
+      notifyListeners();
     }
   }
 

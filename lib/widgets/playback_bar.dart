@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../screens/full_player_screen.dart';
 
-class PlaybackBar extends StatelessWidget {
+class PlaybackBar extends StatefulWidget {
   final AudioPlayer audioPlayer;
   final Map<String, dynamic>? currentSong;
   final bool isPlaying;
@@ -14,6 +15,7 @@ class PlaybackBar extends StatelessWidget {
   final VoidCallback? onPrevious;
   final VoidCallback? onShuffle;
   final bool isShuffleEnabled;
+  final double bottomPadding;
 
   const PlaybackBar({
     super.key,
@@ -28,7 +30,42 @@ class PlaybackBar extends StatelessWidget {
     this.onPrevious,
     this.onShuffle,
     this.isShuffleEnabled = false,
+    this.bottomPadding = 0,
   });
+
+  @override
+  State<PlaybackBar> createState() => _PlaybackBarState();
+}
+
+class _PlaybackBarState extends State<PlaybackBar> {
+  void _openFullPlayer() {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => FullPlayerScreen(
+          audioPlayer: widget.audioPlayer,
+          currentSong: widget.currentSong!,
+          isPlaying: widget.isPlaying,
+          position: widget.position,
+          duration: widget.duration,
+          onPlayPause: widget.onPlayPause,
+          onStop: widget.onStop,
+          onNext: widget.onNext,
+          onPrevious: widget.onPrevious,
+          onShuffle: widget.onShuffle,
+          isShuffleEnabled: widget.isShuffleEnabled,
+        ),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          const begin = Offset(0.0, 1.0);
+          const end = Offset.zero;
+          const curve = Curves.easeInOut;
+          var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+          var offsetAnimation = animation.drive(tween);
+          return SlideTransition(position: offsetAnimation, child: child);
+        },
+        transitionDuration: const Duration(milliseconds: 300),
+      ),
+    );
+  }
 
   String _formatDuration(Duration d) {
     final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
@@ -38,177 +75,97 @@ class PlaybackBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (currentSong == null) return const SizedBox.shrink();
+    if (widget.currentSong == null) return const SizedBox.shrink();
 
-    final thumbUrl = currentSong!['thumbnailUrl'] ?? currentSong!['thumbnail_url'];
-    final artist = currentSong!['artist'] ?? '';
+    return _buildMinimizedBar(context);
+  }
+
+  Widget _buildMinimizedBar(BuildContext context) {
     final theme = Theme.of(context);
+    final thumbUrl = widget.currentSong!['thumbnailUrl'] ?? widget.currentSong!['thumbnail_url'];
+    final artist = widget.currentSong!['artist'] ?? '';
 
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              // Album art
-              if (thumbUrl != null)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: CachedNetworkImage(
-                    imageUrl: thumbUrl,
-                    width: 56,
-                    height: 56,
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) => Container(
-                      width: 56,
-                      height: 56,
-                      color: theme.colorScheme.surfaceContainerHigh,
-                      child: Icon(
-                        Icons.music_note,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    errorWidget: (context, url, error) => Container(
-                      width: 56,
-                      height: 56,
-                      color: theme.colorScheme.surfaceContainerHigh,
-                      child: Icon(
-                        Icons.broken_image,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                ),
-              const SizedBox(width: 16),
-              // Song info
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      currentSong!['name'] ?? '',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      artist,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
+    return GestureDetector(
+      onTap: _openFullPlayer,
+      child: Container(
+        height: 80,
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 8,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            if (thumbUrl != null)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: CachedNetworkImage(
+                  imageUrl: thumbUrl,
+                  width: 56,
+                  height: 56,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => _buildPlaceholder(theme, Icons.music_note),
+                  errorWidget: (context, url, error) => _buildPlaceholder(theme, Icons.broken_image),
                 ),
               ),
-              const SizedBox(width: 8),
-              // Control buttons
-              Row(
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (onShuffle != null)
-                    IconButton(
-                      icon: Icon(Icons.shuffle),
-                      color: isShuffleEnabled
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.onSurfaceVariant,
-                      onPressed: onShuffle,
-                      tooltip: 'Shuffle',
-                    ),
-                  if (onPrevious != null)
-                    IconButton(
-                      icon: const Icon(Icons.skip_previous),
-                      onPressed: onPrevious,
-                      tooltip: 'Previous',
-                    ),
-                  Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primaryContainer,
-                      shape: BoxShape.circle,
-                    ),
-                    child: IconButton(
-                      icon: Icon(
-                        isPlaying ? Icons.pause : Icons.play_arrow,
-                        size: 28,
-                      ),
-                      color: theme.colorScheme.onPrimaryContainer,
-                      onPressed: onPlayPause,
-                      tooltip: isPlaying ? 'Pause' : 'Play',
-                    ),
+                  Text(
+                    widget.currentSong!['name'] ?? '',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
                   ),
-                  if (onNext != null)
-                    IconButton(
-                      icon: const Icon(Icons.skip_next),
-                      onPressed: onNext,
-                      tooltip: 'Next',
+                  const SizedBox(height: 2),
+                  Text(
+                    artist,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
-                  IconButton(
-                    icon: const Icon(Icons.stop),
-                    onPressed: onStop,
-                    tooltip: 'Stop',
                   ),
                 ],
               ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          // Progress bar with time labels
-          Row(
-            children: [
-              Text(
-                _formatDuration(position),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                  fontVariations: [const FontVariation('wght', 500)],
-                ),
-              ),
-              Expanded(
-                child: SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    trackHeight: 3,
-                    thumbShape: const RoundSliderThumbShape(
-                      enabledThumbRadius: 6,
-                    ),
-                    overlayShape: const RoundSliderOverlayShape(
-                      overlayRadius: 14,
-                    ),
-                  ),
-                  child: Slider(
-                    value: position.inSeconds.toDouble(),
-                    max: duration.inSeconds > 0 ? duration.inSeconds.toDouble() : 1.0,
-                    onChanged: (value) {
-                      audioPlayer.seek(Duration(seconds: value.toInt()));
-                    },
-                  ),
-                ),
-              ),
-              Text(
-                _formatDuration(duration),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                  fontVariations: [const FontVariation('wght', 500)],
-                ),
-              ),
-            ],
-          ),
-        ],
+            ),
+            const SizedBox(width: 8),
+            _buildPlayButton(theme),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlaceholder(ThemeData theme, IconData icon, {double size = 56}) {
+    return Container(
+      width: size,
+      height: size,
+      color: theme.colorScheme.surfaceContainerHigh,
+      child: Icon(icon, size: size == 56 ? 24 : size, color: theme.colorScheme.onSurfaceVariant),
+    );
+  }
+
+  Widget _buildPlayButton(ThemeData theme) {
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer,
+        shape: BoxShape.circle,
+      ),
+      child: IconButton(
+        icon: Icon(widget.isPlaying ? Icons.pause : Icons.play_arrow, size: 28),
+        color: theme.colorScheme.onPrimaryContainer,
+        onPressed: widget.onPlayPause,
+        tooltip: widget.isPlaying ? 'Pause' : 'Play',
       ),
     );
   }
