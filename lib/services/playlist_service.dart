@@ -134,4 +134,34 @@ class PlaylistService {
       await _savePlaylists();
     }
   }
+
+  /// Resolves thumbnail URLs for a playlist by matching songs with library songs
+  /// Returns up to 4 thumbnail URLs for display in playlist artwork
+  List<String> getPlaylistThumbnails(
+    Playlist playlist,
+    List<Map<String, dynamic>> librarySongs,
+  ) {
+    final thumbnails = <String>[];
+
+    for (var song in playlist.songs.take(4)) {
+      final storedPath = song['path'] as String?;
+      if (storedPath == null) continue;
+
+      final filename = storedPath.split('/').last;
+      final librarySong = librarySongs.firstWhere(
+        (s) => (s['path'] as String).split('/').last == filename,
+        orElse: () => <String, dynamic>{},
+      );
+
+      final thumbnailUrl = librarySong.isNotEmpty
+          ? librarySong['thumbnail_url']
+          : song['thumbnail_url'];
+
+      if (thumbnailUrl != null) {
+        thumbnails.add(thumbnailUrl as String);
+      }
+    }
+
+    return thumbnails;
+  }
 }

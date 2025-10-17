@@ -421,8 +421,12 @@ class PlaylistDetailScreen extends StatelessWidget {
             isPlaying: musicPlayerProvider.isPlaying,
             position: musicPlayerProvider.position,
             duration: musicPlayerProvider.duration,
-            onPlayPause: () => musicPlayerProvider
-                .playSong(musicPlayerProvider.currentlyPlayingPath!),
+            onPlayPause: () {
+              final path = musicPlayerProvider.currentlyPlayingPath;
+              if (path != null) {
+                musicPlayerProvider.playSong(path);
+              }
+            },
             onStop: musicPlayerProvider.stop,
             onNext: musicPlayerProvider.playQueue.length > 1
                 ? musicPlayerProvider.playNext
