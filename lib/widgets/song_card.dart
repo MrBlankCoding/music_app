@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class SongCard extends StatelessWidget {
   final Map<String, dynamic> song;
@@ -9,6 +10,9 @@ class SongCard extends StatelessWidget {
   final bool showDragHandle;
   final Key? cardKey;
   final int? reorderIndex;
+  final bool enableSwipeToDelete;
+  final Future<void> Function()? onDelete;
+  final String? deleteConfirmMessage;
 
   const SongCard({
     super.key,
@@ -20,6 +24,9 @@ class SongCard extends StatelessWidget {
     this.showDragHandle = false,
     this.cardKey,
     this.reorderIndex,
+    this.enableSwipeToDelete = false,
+    this.onDelete,
+    this.deleteConfirmMessage,
   });
 
   @override
@@ -29,7 +36,7 @@ class SongCard extends StatelessWidget {
     final artist = song['artist'] as String? ?? 'Unknown Artist';
     final title = song['title'] as String? ?? song['name'] as String;
 
-    return Card(
+    final cardWidget = Card(
       key: cardKey,
       margin: const EdgeInsets.symmetric(
         horizontal: 4,
@@ -47,7 +54,14 @@ class SongCard extends StatelessWidget {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
+        onLongPress: () {
+          HapticFeedback.mediumImpact();
+          // Long press could trigger additional actions in the future
+        },
         child: Padding(
           padding: const EdgeInsets.all(12.0),
           child: Row(
@@ -86,7 +100,7 @@ class SongCard extends StatelessWidget {
                     color: Theme.of(context).colorScheme.surfaceContainerHighest,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Theme.of(context).shadowColor.withOpacity(0.1),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
@@ -180,7 +194,10 @@ class SongCard extends StatelessWidget {
                       size: 32,
                     ),
                     color: Theme.of(context).colorScheme.primary,
-                    onPressed: onPlay,
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      onPlay();
+                    },
                   ),
                   if (menuItems != null)
                     PopupMenuButton<String>(
@@ -194,5 +211,57 @@ class SongCard extends StatelessWidget {
         ),
       ),
     );
+
+    // Wrap with Dismissible if swipe-to-delete is enabled
+    if (enableSwipeToDelete && onDelete != null) {
+      return Dismissible(
+        key: Key('song_dismiss_$songPath'),
+        direction: DismissDirection.endToStart,
+        background: Container(
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.only(right: 20),
+          margin: const EdgeInsets.symmetric(
+            horizontal: 4,
+            vertical: 6,
+          ),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.error,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Icon(
+            Icons.delete,
+            color: Colors.white,
+            size: 32,
+          ),
+        ),
+        confirmDismiss: (direction) async {
+          HapticFeedback.mediumImpact();
+          return await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Delete Song'),
+              content: Text(deleteConfirmMessage ?? 'Are you sure you want to delete this song?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Delete'),
+                ),
+              ],
+            ),
+          );
+        },
+        onDismissed: (direction) async {
+          HapticFeedback.lightImpact();
+          await onDelete!();
+        },
+        child: cardWidget,
+      );
+    }
+
+    return cardWidget;
   }
 }

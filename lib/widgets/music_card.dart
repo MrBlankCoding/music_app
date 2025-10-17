@@ -43,14 +43,20 @@ class _MusicCardState extends State<MusicCard> {
           placeholder: (context, url) => Container(
             width: 80,
             height: 60,
-            color: Colors.grey[300],
-            child: const Icon(Icons.music_note),
+            color: Theme.of(context).colorScheme.surfaceContainerHigh,
+            child: Icon(
+              Icons.music_note,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
           errorWidget: (context, url, error) => Container(
             width: 80,
             height: 60,
-            color: Colors.grey[300],
-            child: const Icon(Icons.broken_image),
+            color: Theme.of(context).colorScheme.surfaceContainerHigh,
+            child: Icon(
+              Icons.broken_image,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
       ),

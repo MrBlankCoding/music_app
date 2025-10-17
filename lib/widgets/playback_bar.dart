@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/services.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../screens/full_player_screen.dart';
 
@@ -38,7 +39,10 @@ class PlaybackBar extends StatefulWidget {
 }
 
 class _PlaybackBarState extends State<PlaybackBar> {
+  double _swipeOffset = 0.0;
+
   void _openFullPlayer() {
+    HapticFeedback.mediumImpact();
     Navigator.of(context).push(
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) => FullPlayerScreen(
@@ -97,72 +101,43 @@ class _PlaybackBarState extends State<PlaybackBar> {
     final posMs = widget.position.inMilliseconds;
     final progress = totalMs > 0 ? (posMs / totalMs).clamp(0.0, 1.0) : 0.0;
 
-    const double barHeight = 4.0; // thicker bar
-    const double dotSize = 10.0;   // dot diameter
+    const double barHeight = 4.0;
+    const double dotSize = 12.0;
 
     return GestureDetector(
       onTap: _openFullPlayer,
+      onVerticalDragUpdate: (details) {
+        if (details.primaryDelta! < 0) {
+          setState(() {
+            _swipeOffset += details.primaryDelta!;
+          });
+        }
+      },
+      onVerticalDragEnd: (details) {
+        if (_swipeOffset < -50) {
+          _openFullPlayer();
+        }
+        setState(() {
+          _swipeOffset = 0.0;
+        });
+      },
       child: Container(
-        height: 80,
         decoration: BoxDecoration(
           color: theme.colorScheme.surfaceContainerHighest,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: theme.shadowColor.withOpacity(0.1),
               blurRadius: 8,
               offset: const Offset(0, -2),
             ),
           ],
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Stack(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              children: [
-                if (thumbUrl != null)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: CachedNetworkImage(
-                      imageUrl: thumbUrl,
-                      width: 56,
-                      height: 56,
-                      fit: BoxFit.cover,
-                      placeholder: (context, url) => _buildPlaceholder(theme, Icons.music_note),
-                      errorWidget: (context, url, error) => _buildPlaceholder(theme, Icons.broken_image),
-                    ),
-                  ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        widget.currentSong!['name'] ?? '',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        artist,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                _buildPlayButton(theme),
-              ],
-            ),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
+            // Progress bar at the top
+            SizedBox(
+              height: barHeight + 4, // Extra space for the dot
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final width = constraints.maxWidth;
@@ -179,6 +154,7 @@ class _PlaybackBarState extends State<PlaybackBar> {
                     },
                     child: Stack(
                       clipBehavior: Clip.none,
+                      alignment: Alignment.center,
                       children: [
                         // Background bar
                         Container(
@@ -190,28 +166,34 @@ class _PlaybackBarState extends State<PlaybackBar> {
                           ),
                         ),
                         // Filled progress
-                        Container(
-                          height: barHeight,
-                          width: filledWidth,
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.primary,
-                            borderRadius: BorderRadius.circular(barHeight / 2),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Container(
+                            height: barHeight,
+                            width: filledWidth,
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primary,
+                              borderRadius: BorderRadius.circular(barHeight / 2),
+                            ),
                           ),
                         ),
                         // Position dot
                         Positioned(
                           left: dotLeft,
-                          top: -(dotSize - barHeight) / 2,
                           child: Container(
                             width: dotSize,
                             height: dotSize,
                             decoration: BoxDecoration(
                               color: theme.colorScheme.primary,
                               shape: BoxShape.circle,
+                              border: Border.all(
+                                color: theme.colorScheme.surfaceContainerHighest,
+                                width: 2,
+                              ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: theme.colorScheme.primary.withOpacity(0.3),
-                                  blurRadius: 6,
+                                  color: theme.colorScheme.primary.withOpacity(0.4),
+                                  blurRadius: 4,
                                   spreadRadius: 0,
                                 ),
                               ],
@@ -224,6 +206,103 @@ class _PlaybackBarState extends State<PlaybackBar> {
                 },
               ),
             ),
+            // Main content area
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              child: Row(
+                children: [
+                  // Album artwork
+                  if (thumbUrl != null)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: CachedNetworkImage(
+                        imageUrl: thumbUrl,
+                        width: 56,
+                        height: 56,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => _buildPlaceholder(theme, Icons.music_note),
+                        errorWidget: (context, url, error) => _buildPlaceholder(theme, Icons.broken_image),
+                      ),
+                    )
+                  else
+                    _buildPlaceholder(theme, Icons.music_note),
+                  const SizedBox(width: 12),
+                  // Song info
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          widget.currentSong!['name'] ?? 'Unknown',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          artist.isEmpty ? 'Unknown Artist' : artist,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Control buttons
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (widget.onPrevious != null)
+                        IconButton(
+                          icon: const Icon(Icons.skip_previous),
+                          iconSize: 28,
+                          color: theme.colorScheme.onSurfaceVariant,
+                          onPressed: () {
+                            HapticFeedback.lightImpact();
+                            widget.onPrevious!();
+                          },
+                          tooltip: 'Previous',
+                        ),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: IconButton(
+                          icon: Icon(
+                            widget.isPlaying ? Icons.pause : Icons.play_arrow,
+                            size: 28,
+                          ),
+                          color: theme.colorScheme.onPrimary,
+                          onPressed: () {
+                            HapticFeedback.lightImpact();
+                            widget.onPlayPause();
+                          },
+                          tooltip: widget.isPlaying ? 'Pause' : 'Play',
+                        ),
+                      ),
+                      if (widget.onNext != null)
+                        IconButton(
+                          icon: const Icon(Icons.skip_next),
+                          iconSize: 28,
+                          color: theme.colorScheme.onSurfaceVariant,
+                          onPressed: () {
+                            HapticFeedback.lightImpact();
+                            widget.onNext!();
+                          },
+                          tooltip: 'Next',
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -234,22 +313,14 @@ class _PlaybackBarState extends State<PlaybackBar> {
     return Container(
       width: size,
       height: size,
-      color: theme.colorScheme.surfaceContainerHigh,
-      child: Icon(icon, size: size == 56 ? 24 : size, color: theme.colorScheme.onSurfaceVariant),
-    );
-  }
-
-  Widget _buildPlayButton(ThemeData theme) {
-    return Container(
       decoration: BoxDecoration(
-        color: theme.colorScheme.primaryContainer,
-        shape: BoxShape.circle,
+        color: theme.colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(8),
       ),
-      child: IconButton(
-        icon: Icon(widget.isPlaying ? Icons.pause : Icons.play_arrow, size: 28),
-        color: theme.colorScheme.onPrimaryContainer,
-        onPressed: widget.onPlayPause,
-        tooltip: widget.isPlaying ? 'Pause' : 'Play',
+      child: Icon(
+        icon,
+        size: 24,
+        color: theme.colorScheme.onSurfaceVariant,
       ),
     );
   }

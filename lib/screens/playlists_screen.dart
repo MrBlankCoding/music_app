@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:audioplayers/audioplayers.dart';
 import '../providers/playlist_provider.dart';
 import '../providers/library_provider.dart';
 import '../models/playlist.dart';
@@ -104,7 +104,7 @@ class PlaylistsScreen extends StatelessWidget {
                       Icon(
                         Icons.playlist_play,
                         size: 80,
-                        color: Colors.grey[400],
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                       const SizedBox(height: 16),
                       Text(
@@ -115,39 +115,100 @@ class PlaylistsScreen extends StatelessWidget {
                       Text(
                         'Make a playlist!',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.grey[600],
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                             ),
                       ),
                     ],
                   ),
                 )
-              : ListView.builder(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  itemCount: playlistProvider.playlists.length,
-                  itemBuilder: (context, index) {
-                    final playlist = playlistProvider.playlists[index];
-                    return _PlaylistCard(
-                      playlist: playlist,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => PlaylistDetailScreen(
-                              playlistId: playlist.id,
-                            ),
-                          ),
-                        ).then((_) {
-                          if (context.mounted) {
-                            context.read<PlaylistProvider>().loadPlaylists();
-                          }
-                        });
-                      },
-                      onDelete: () => _deletePlaylist(context, playlist),
-                    );
+              : RefreshIndicator(
+                  onRefresh: () async {
+                    await playlistProvider.loadPlaylists();
                   },
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    itemCount: playlistProvider.playlists.length,
+                    itemBuilder: (context, index) {
+                      final playlist = playlistProvider.playlists[index];
+                      return Dismissible(
+                        key: Key('playlist_${playlist.id}'),
+                        direction: DismissDirection.endToStart,
+                        background: Container(
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.only(right: 20),
+                          margin: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.error,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Icon(
+                            Icons.delete,
+                            color: Colors.white,
+                            size: 32,
+                          ),
+                        ),
+                        confirmDismiss: (direction) async {
+                          return await showDialog<bool>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text('Delete Playlist'),
+                              content: Text('Delete "${playlist.name}"?'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, false),
+                                  child: const Text('Cancel'),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, true),
+                                  child: const Text('Delete'),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                        onDismissed: (direction) async {
+                          await playlistProvider.deletePlaylist(playlist.id);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('"${playlist.name}" deleted'),
+                                action: SnackBarAction(
+                                  label: 'Undo',
+                                  onPressed: () {
+                                    // Could implement undo functionality here
+                                  },
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                        child: _PlaylistCard(
+                          playlist: playlist,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => PlaylistDetailScreen(
+                                  playlistId: playlist.id,
+                                ),
+                              ),
+                            ).then((_) {
+                              if (context.mounted) {
+                                context.read<PlaylistProvider>().loadPlaylists();
+                              }
+                            });
+                          },
+                          onDelete: () => _deletePlaylist(context, playlist),
+                        ),
+                      );
+                    },
+                  ),
                 ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showCreatePlaylistDialog(context),
@@ -169,47 +230,32 @@ class _PlaylistCard extends StatelessWidget {
     required this.onDelete,
   });
 
-  Future<String> _getPlaylistDuration() async {
-    final player = AudioPlayer();
-    int totalSeconds = 0;
-
-    for (final songPath in playlist.songPaths) {
-      try {
-        await player.setSourceDeviceFile(songPath);
-        final duration = await player.getDuration();
-        if (duration != null) {
-          totalSeconds += duration.inSeconds;
-        }
-      } catch (e) {
-        // Skip songs that can't be loaded
-        continue;
-      }
-    }
-
-    await player.dispose();
-
-    final duration = Duration(seconds: totalSeconds);
-    final h = duration.inHours;
-    final m = duration.inMinutes.remainder(60);
-
-    if (h > 0) {
-      return '${h}h ${m}m';
-    }
-    return '${m}m';
-  }
 
   Widget _buildPlaylistArtwork(BuildContext context) {
     final libraryProvider = context.watch<LibraryProvider>();
-
+    
     // Get thumbnails from the first 4 songs in the playlist
+    // Reconcile with library to get current metadata
     final thumbnails = <String>[];
-    for (var songPath in playlist.songPaths.take(4)) {
-      final song = libraryProvider.songs.firstWhere(
-        (s) => s['path'] == songPath,
-        orElse: () => <String, dynamic>{},
-      );
-      if (song.isNotEmpty && song['thumbnail_url'] != null) {
-        thumbnails.add(song['thumbnail_url'] as String);
+    for (var song in playlist.songs.take(4)) {
+      final storedPath = song['path'] as String?;
+      if (storedPath != null) {
+        final filename = storedPath.split('/').last;
+        
+        // Try to find matching song in library by filename
+        final librarySong = libraryProvider.songs.firstWhere(
+          (s) => (s['path'] as String).split('/').last == filename,
+          orElse: () => <String, dynamic>{},
+        );
+        
+        // Use library thumbnail if available, otherwise use stored
+        final thumbnailUrl = librarySong.isNotEmpty 
+            ? librarySong['thumbnail_url'] 
+            : song['thumbnail_url'];
+            
+        if (thumbnailUrl != null) {
+          thumbnails.add(thumbnailUrl as String);
+        }
       }
     }
 
@@ -217,7 +263,7 @@ class _PlaylistCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withOpacity(0.1),
+          color: Theme.of(context).shadowColor.withOpacity(0.1),
           blurRadius: 8,
           offset: const Offset(0, 2),
         ),
@@ -337,7 +383,13 @@ class _PlaylistCard extends StatelessWidget {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
+        onLongPress: () {
+          HapticFeedback.mediumImpact();
+        },
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Row(
@@ -375,67 +427,25 @@ class _PlaylistCard extends StatelessWidget {
                       ),
                     ],
                     const SizedBox(height: 8),
-                    FutureBuilder<String>(
-                      future: _getPlaylistDuration(),
-                      builder: (context, snapshot) {
-                        final duration = snapshot.data ?? 'Calculating...';
-                        return Row(
-                          children: [
-                            Icon(
-                              Icons.music_note,
-                              size: 16,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${playlist.songPaths.length} songs',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                    color:
-                                        Theme.of(context).colorScheme.primary,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                            ),
-                            if (snapshot.hasData &&
-                                playlist.songPaths.isNotEmpty) ...[
-                              const SizedBox(width: 8),
-                              Text(
-                                '•',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant,
-                                    ),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.music_note,
+                          size: 16,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${playlist.songCount} songs',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.primary,
+                                fontWeight: FontWeight.w500,
                               ),
-                              const SizedBox(width: 8),
-                              Icon(
-                                Icons.access_time,
-                                size: 16,
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                duration,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant,
-                                    ),
-                              ),
-                            ],
-                          ],
-                        );
-                      },
+                        ),
+                      ],
                     ),
                   ],
                 ),

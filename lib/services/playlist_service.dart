@@ -56,7 +56,7 @@ class PlaylistService {
       name: name,
       description: description,
       createdAt: DateTime.now(),
-      songPaths: [],
+      songs: [],
     );
     
     _playlists.add(playlist);
@@ -77,13 +77,23 @@ class PlaylistService {
     }
   }
 
-  Future<void> addSongToPlaylist(String playlistId, String songPath) async {
+  Future<void> addSongToPlaylist(String playlistId, Map<String, dynamic> song) async {
     final index = _playlists.indexWhere((p) => p.id == playlistId);
     if (index != -1) {
       final playlist = _playlists[index];
-      if (!playlist.songPaths.contains(songPath)) {
+      final songPath = song['path'] as String;
+      
+      // Check if song already exists in playlist
+      final exists = playlist.songs.any((s) => s['path'] == songPath);
+      if (!exists) {
+        // Ensure DateTime is properly formatted
+        final songCopy = Map<String, dynamic>.from(song);
+        if (songCopy['modified'] is DateTime) {
+          songCopy['modified'] = (songCopy['modified'] as DateTime).toIso8601String();
+        }
+        
         _playlists[index] = playlist.copyWith(
-          songPaths: [...playlist.songPaths, songPath],
+          songs: [...playlist.songs, songCopy],
         );
         await _savePlaylists();
       }
@@ -94,8 +104,8 @@ class PlaylistService {
     final index = _playlists.indexWhere((p) => p.id == playlistId);
     if (index != -1) {
       final playlist = _playlists[index];
-      final updatedSongs = playlist.songPaths.where((p) => p != songPath).toList();
-      _playlists[index] = playlist.copyWith(songPaths: updatedSongs);
+      final updatedSongs = playlist.songs.where((s) => s['path'] != songPath).toList();
+      _playlists[index] = playlist.copyWith(songs: updatedSongs);
       await _savePlaylists();
     }
   }
@@ -112,9 +122,10 @@ class PlaylistService {
     bool modified = false;
     for (int i = 0; i < _playlists.length; i++) {
       final playlist = _playlists[i];
-      if (playlist.songPaths.contains(songPath)) {
+      final hasSong = playlist.songs.any((s) => s['path'] == songPath);
+      if (hasSong) {
         _playlists[i] = playlist.copyWith(
-          songPaths: playlist.songPaths.where((p) => p != songPath).toList(),
+          songs: playlist.songs.where((s) => s['path'] != songPath).toList(),
         );
         modified = true;
       }

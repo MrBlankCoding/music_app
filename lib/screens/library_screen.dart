@@ -1,8 +1,7 @@
 
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:audioplayers/audioplayers.dart';
+import 'package:just_audio/just_audio.dart';
 import '../providers/library_provider.dart';
 import '../providers/music_player_provider.dart';
 import '../providers/playlist_provider.dart';
@@ -38,7 +37,7 @@ class LibraryScreen extends StatelessWidget {
       );
 
       if (createNew == true) {
-        await _showCreatePlaylistDialog(context, song['path']);
+        await _showCreatePlaylistDialog(context, song);
       }
       return;
     }
@@ -64,7 +63,7 @@ class LibraryScreen extends StatelessWidget {
               return ListTile(
                 leading: const Icon(Icons.playlist_play),
                 title: Text(playlist.name),
-                subtitle: Text('${playlist.songPaths.length} songs'),
+                subtitle: Text('${playlist.songCount} songs'),
                 onTap: () => Navigator.pop(context, playlist),
               );
             },
@@ -83,7 +82,7 @@ class LibraryScreen extends StatelessWidget {
       try {
         await playlistProvider.addSongToPlaylist(
           selectedPlaylist.id,
-          song['path'],
+          song,
         );
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -102,7 +101,7 @@ class LibraryScreen extends StatelessWidget {
     }
   }
 
-  Future<void> _showCreatePlaylistDialog(BuildContext context, String songPath) async {
+  Future<void> _showCreatePlaylistDialog(BuildContext context, Map<String, dynamic> song) async {
     final nameController = TextEditingController();
     final descriptionController = TextEditingController();
     final playlistProvider = context.read<PlaylistProvider>();
@@ -156,7 +155,7 @@ class LibraryScreen extends StatelessWidget {
               : descriptionController.text,
         );
         if (playlist != null) {
-          await playlistProvider.addSongToPlaylist(playlist.id, songPath);
+          await playlistProvider.addSongToPlaylist(playlist.id, song);
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('Created "${playlist.name}" and added song')),
@@ -175,53 +174,33 @@ class LibraryScreen extends StatelessWidget {
 
   Future<void> _deleteSong(BuildContext context, Map<String, dynamic> song) async {
     if (!context.mounted) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Song'),
-        content: const Text('Are you sure you want to delete this song? This action cannot be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true && context.mounted) {
-      final musicPlayerProvider = context.read<MusicPlayerProvider>();
-      final libraryProvider = context.read<LibraryProvider>();
-      final playlistProvider = context.read<PlaylistProvider>();
-      if (musicPlayerProvider.currentlyPlayingPath == song['path']) {
-        await musicPlayerProvider.stop();
-      }
-      await libraryProvider.deleteSong(song['path']);
-      await playlistProvider.removeSongFromAllPlaylists(song['path']);
-      await libraryProvider.loadSongs();
+    
+    final musicPlayerProvider = context.read<MusicPlayerProvider>();
+    final libraryProvider = context.read<LibraryProvider>();
+    final playlistProvider = context.read<PlaylistProvider>();
+    
+    if (musicPlayerProvider.currentlyPlayingPath == song['path']) {
+      await musicPlayerProvider.stop();
     }
-  }
-
-  String _formatBytes(int bytes) {
-    if (bytes <= 0) return "0 B";
-    const suffixes = ["B", "KB", "MB", "GB", "TB"];
-    final i = (log(bytes) / log(1024)).floor();
-    return '${(bytes / pow(1024, i)).toStringAsFixed(2)} ${suffixes[i]}';
+    await libraryProvider.deleteSong(song['path']);
+    await playlistProvider.removeSongFromAllPlaylists(song['path']);
+    await libraryProvider.loadSongs();
   }
 
   Future<String> _getSongDuration(String path) async {
     final player = AudioPlayer();
-    await player.setSourceDeviceFile(path);
-    final duration = await player.getDuration();
-    await player.dispose();
-    if (duration == null) return '--:--';
-    final m = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final s = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$m:$s';
+    try {
+      await player.setAudioSource(AudioSource.uri(Uri.file(path)));
+      final duration = player.duration;
+      if (duration == null) return '--:--';
+      final m = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
+      final s = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+      return '$m:$s';
+    } catch (e) {
+      return '--:--';
+    } finally {
+      await player.dispose();
+    }
   }
 
   @override
@@ -247,75 +226,85 @@ class LibraryScreen extends StatelessWidget {
                 ? const Center(child: CircularProgressIndicator())
                 : libraryProvider.songs.isEmpty
                     ? const Center(child: Text('No songs'))
-                    : ListView.builder(
-                        padding: EdgeInsets.only(
-                          top: 8,
-                          left: 12,
-                          right: 12,
-                          bottom: musicPlayerProvider.currentlyPlayingPath != null ? 120 : 20,
-                        ),
-                        itemCount: libraryProvider.songs.length,
-                        itemBuilder: (context, index) {
-                          final song = libraryProvider.songs[index];
-                          final isPlaying = musicPlayerProvider.currentlyPlayingPath == song['path'];
-                          
-                          return SongCard(
-                            song: song,
-                            isPlaying: isPlaying && musicPlayerProvider.isPlaying,
-                            onTap: () async {
-                              if (musicPlayerProvider.currentlyPlayingPath != song['path']) {
-                                await musicPlayerProvider.setQueue(libraryProvider.songs, initialIndex: index);
-                              } else {
-                                await musicPlayerProvider.playSong(song['path']);
-                              }
-                            },
-                            onPlay: () async {
-                              if (musicPlayerProvider.currentlyPlayingPath != song['path']) {
-                                await musicPlayerProvider.setQueue(libraryProvider.songs, initialIndex: index);
-                              } else {
-                                await musicPlayerProvider.playSong(song['path']);
-                              }
-                            },
-                            menuItems: [
-                              PopupMenuItem<String>(
-                                value: 'add_to_playlist',
-                                child: ListTile(
-                                  leading: const Icon(Icons.playlist_add),
-                                  title: const Text('Add to Playlist'),
-                                  contentPadding: EdgeInsets.zero,
-                                ),
-                                onTap: () {
-                                  Future.delayed(
-                                    const Duration(milliseconds: 100),
-                                    () => _showAddToPlaylistDialog(context, song),
-                                  );
-                                },
-                              ),
-                              PopupMenuItem<String>(
-                                value: 'delete',
-                                child: ListTile(
-                                  leading: Icon(
-                                    Icons.delete,
-                                    color: Theme.of(context).colorScheme.error,
+                    : RefreshIndicator(
+                        onRefresh: () async {
+                          await libraryProvider.loadSongs();
+                        },
+                        child: ListView.builder(
+                          padding: EdgeInsets.only(
+                            top: 8,
+                            left: 12,
+                            right: 12,
+                            bottom: musicPlayerProvider.currentlyPlayingPath != null ? 120 : 20,
+                          ),
+                          itemCount: libraryProvider.songs.length,
+                          itemBuilder: (context, index) {
+                            final song = libraryProvider.songs[index];
+                            final isPlaying = musicPlayerProvider.currentlyPlayingPath == song['path'];
+                            
+                            return SongCard(
+                              song: song,
+                              isPlaying: isPlaying && musicPlayerProvider.isPlaying,
+                              enableSwipeToDelete: true,
+                              deleteConfirmMessage: 'Delete this song from your library? This action cannot be undone.',
+                              onDelete: () async {
+                                await _deleteSong(context, song);
+                              },
+                              onTap: () async {
+                                if (musicPlayerProvider.currentlyPlayingPath != song['path']) {
+                                  await musicPlayerProvider.setQueue(libraryProvider.songs, initialIndex: index);
+                                } else {
+                                  await musicPlayerProvider.playSong(song['path']);
+                                }
+                              },
+                              onPlay: () async {
+                                if (musicPlayerProvider.currentlyPlayingPath != song['path']) {
+                                  await musicPlayerProvider.setQueue(libraryProvider.songs, initialIndex: index);
+                                } else {
+                                  await musicPlayerProvider.playSong(song['path']);
+                                }
+                              },
+                              menuItems: [
+                                PopupMenuItem<String>(
+                                  value: 'add_to_playlist',
+                                  child: ListTile(
+                                    leading: const Icon(Icons.playlist_add),
+                                    title: const Text('Add to Playlist'),
+                                    contentPadding: EdgeInsets.zero,
                                   ),
-                                  title: Text(
-                                    'Delete',
-                                    style: TextStyle(
+                                  onTap: () {
+                                    Future.delayed(
+                                      const Duration(milliseconds: 100),
+                                      () => _showAddToPlaylistDialog(context, song),
+                                    );
+                                  },
+                                ),
+                                PopupMenuItem<String>(
+                                  value: 'delete',
+                                  child: ListTile(
+                                    leading: Icon(
+                                      Icons.delete,
                                       color: Theme.of(context).colorScheme.error,
                                     ),
+                                    title: Text(
+                                      'Delete',
+                                      style: TextStyle(
+                                        color: Theme.of(context).colorScheme.error,
+                                      ),
+                                    ),
+                                    contentPadding: EdgeInsets.zero,
                                   ),
-                                  contentPadding: EdgeInsets.zero,
+                                  onTap: () {
+                                    Future.delayed(
+                                      const Duration(milliseconds: 100),
+                                      () => _deleteSong(context, song),
+                                    );
+                                  },
                                 ),
-                                onTap: () {
-                                  Future.delayed(
-                                    const Duration(milliseconds: 100),
-                                    () => _deleteSong(context, song),
-                                  );
-                                },
-                              ),
-                            ],
-                          );
-                        },
+                              ],
+                            );
+                          },
+                        ),
                       ),
           ),
         ],

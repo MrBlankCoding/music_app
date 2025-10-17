@@ -60,9 +60,9 @@ class PlaylistProvider with ChangeNotifier {
     }
   }
 
-  Future<void> addSongToPlaylist(String playlistId, String songPath) async {
+  Future<void> addSongToPlaylist(String playlistId, Map<String, dynamic> song) async {
     try {
-      await _playlistService.addSongToPlaylist(playlistId, songPath);
+      await _playlistService.addSongToPlaylist(playlistId, song);
       await loadPlaylists();
     } catch (e) {
       // Handle error
@@ -91,9 +91,10 @@ class PlaylistProvider with ChangeNotifier {
       final index = _playlists.indexWhere((p) => p.id == playlistId);
       if (index != -1) {
         final playlist = _playlists[index];
-        final item = playlist.songPaths.removeAt(oldIndex);
-        playlist.songPaths.insert(newIndex, item);
-        await _playlistService.updatePlaylist(playlist);
+        final updatedSongs = List<Map<String, dynamic>>.from(playlist.songs);
+        final item = updatedSongs.removeAt(oldIndex);
+        updatedSongs.insert(newIndex, item);
+        await _playlistService.updatePlaylist(playlist.copyWith(songs: updatedSongs));
         await loadPlaylists();
       }
     } catch (e) {

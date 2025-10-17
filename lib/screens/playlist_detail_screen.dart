@@ -17,33 +17,15 @@ class PlaylistDetailScreen extends StatelessWidget {
     BuildContext context,
     String songPath,
   ) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Remove Song'),
-        content: const Text('Remove this song from the playlist?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
-    );
+    if (!context.mounted) return;
+    
+    final musicPlayerProvider = context.read<MusicPlayerProvider>();
+    final playlistProvider = context.read<PlaylistProvider>();
 
-    if (confirmed == true && context.mounted) {
-      final musicPlayerProvider = context.read<MusicPlayerProvider>();
-      final playlistProvider = context.read<PlaylistProvider>();
-
-      if (musicPlayerProvider.currentlyPlayingPath == songPath) {
-        await musicPlayerProvider.stop();
-      }
-      await playlistProvider.removeSongFromPlaylist(playlistId, songPath);
+    if (musicPlayerProvider.currentlyPlayingPath == songPath) {
+      await musicPlayerProvider.stop();
     }
+    await playlistProvider.removeSongFromPlaylist(playlistId, songPath);
   }
 
   Future<void> _editPlaylist(BuildContext context, Playlist playlist) async {
@@ -108,18 +90,58 @@ class PlaylistDetailScreen extends StatelessWidget {
     Playlist playlist,
     LibraryProvider libraryProvider,
   ) {
-    return playlist.songPaths.map((path) {
-      // Try to find the song in the library with metadata
+    // Reconcile playlist songs with current library to handle path changes
+    // (e.g., when app is reinstalled and container path changes)
+    final List<Map<String, dynamic>> reconciledSongs = [];
+    
+    for (final song in playlist.songs) {
+      final storedPath = song['path'] as String?;
+      if (storedPath == null) continue;
+      
+      // Extract filename from stored path
+      final filename = storedPath.split('/').last;
+      
+      // Try to find matching song in current library by filename
       final librarySong = libraryProvider.songs.firstWhere(
-        (s) => s['path'] == path,
+        (s) => (s['path'] as String).split('/').last == filename,
         orElse: () => <String, dynamic>{},
       );
-
+      
+      Map<String, dynamic> songCopy;
+      
       if (librarySong.isNotEmpty) {
-        return librarySong;
+        // Use current library song (has correct path)
+        songCopy = Map<String, dynamic>.from(librarySong);
+      } else {
+        // Library song not found, use stored metadata but keep old path
+        songCopy = <String, dynamic>{
+          'path': storedPath,
+          'name': song['name'] ?? filename.replaceAll('.mp3', ''),
+          'artist': song['artist'] ?? 'Unknown Artist',
+          'size': song['size'] ?? 0,
+          'thumbnail_url': song['thumbnail_url'],
+          'title': song['title'] ?? song['name'] ?? filename.replaceAll('.mp3', ''),
+          'video_id': song['video_id'],
+        };
+        
+        // Parse DateTime if it's stored as a string
+        if (song['modified'] is String) {
+          try {
+            songCopy['modified'] = DateTime.parse(song['modified'] as String);
+          } catch (e) {
+            songCopy['modified'] = DateTime.now();
+          }
+        } else if (song['modified'] is DateTime) {
+          songCopy['modified'] = song['modified'];
+        } else {
+          songCopy['modified'] = DateTime.now();
+        }
       }
-      return null;
-    }).whereType<Map<String, dynamic>>().toList();
+      
+      reconciledSongs.add(songCopy);
+    }
+    
+    return reconciledSongs;
   }
 
   Future<void> _handleSongTap(
@@ -137,12 +159,8 @@ class PlaylistDetailScreen extends StatelessWidget {
 
   Widget _buildPlaylistArtwork(BuildContext context, Playlist playlist, LibraryProvider libraryProvider) {
     final thumbnails = <String>[];
-    for (var songPath in playlist.songPaths.take(4)) {
-      final song = libraryProvider.songs.firstWhere(
-        (s) => s['path'] == songPath,
-        orElse: () => <String, dynamic>{},
-      );
-      if (song.isNotEmpty && song['thumbnail_url'] != null) {
+    for (var song in playlist.songs.take(4)) {
+      if (song['thumbnail_url'] != null) {
         thumbnails.add(song['thumbnail_url'] as String);
       }
     }
@@ -165,7 +183,7 @@ class PlaylistDetailScreen extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Theme.of(context).shadowColor.withOpacity(0.1),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -187,7 +205,7 @@ class PlaylistDetailScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Theme.of(context).shadowColor.withOpacity(0.1),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -337,6 +355,11 @@ class PlaylistDetailScreen extends StatelessWidget {
                         isPlaying: isPlaying && musicPlayerProvider.isPlaying,
                         showDragHandle: true,
                         reorderIndex: index,
+                        enableSwipeToDelete: true,
+                        deleteConfirmMessage: 'Remove this song from the playlist?',
+                        onDelete: () async {
+                          await _removeSongFromPlaylist(context, songPath);
+                        },
                         onTap: () => _handleSongTap(
                           musicPlayerProvider,
                           song,

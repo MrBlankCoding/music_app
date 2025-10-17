@@ -114,7 +114,7 @@ class _DownloadQueueScreenState extends State<DownloadQueueScreen> {
                           _getProgressText(progress, details),
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey[600],
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                         ),
                         if (details != null &&
@@ -124,7 +124,7 @@ class _DownloadQueueScreenState extends State<DownloadQueueScreen> {
                             _formatSpeed(details['speed']),
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.grey[600],
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                             ),
                           ),
                       ],
@@ -138,7 +138,7 @@ class _DownloadQueueScreenState extends State<DownloadQueueScreen> {
                           'ETA: ${_formatEta(details['eta'])}',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey[600],
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ),
@@ -147,7 +147,7 @@ class _DownloadQueueScreenState extends State<DownloadQueueScreen> {
                       'Queued',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.grey[600],
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                 ],

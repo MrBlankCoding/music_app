@@ -66,8 +66,12 @@ class _VideoDetailsSheetState extends State<VideoDetailsSheet> {
               fit: BoxFit.cover,
               placeholder: (context, url) => Container(
                 height: 180,
-                color: Colors.grey[300],
-                child: const Icon(Icons.music_note, size: 60),
+                color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                child: Icon(
+                  Icons.music_note,
+                  size: 60,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
           ),
@@ -84,7 +88,9 @@ class _VideoDetailsSheetState extends State<VideoDetailsSheet> {
           const SizedBox(height: 8),
           Text(
             widget.video.channelTitle,
-            style: TextStyle(color: Colors.grey[600]),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 16),
           if (_isDownloading) ...[

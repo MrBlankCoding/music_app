@@ -1,9 +1,10 @@
-
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:audioplayers/audioplayers.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:just_audio_background/just_audio_background.dart';
+import 'package:audio_session/audio_session.dart';
 import '../models/youtube_video.dart';
 
 class MusicPlayerProvider with ChangeNotifier {
@@ -20,12 +21,18 @@ class MusicPlayerProvider with ChangeNotifier {
   Duration _position = Duration.zero;
 
   StreamSubscription<Duration>? _positionSubscription;
-  StreamSubscription<Duration>? _durationSubscription;
+  StreamSubscription<Duration?>? _durationSubscription;
   StreamSubscription<PlayerState>? _playerStateSubscription;
-  StreamSubscription<void>? _completeSubscription;
+  StreamSubscription<SequenceState?>? _sequenceSub;
 
   MusicPlayerProvider() {
+    _initSession();
     _setupAudioPlayer();
+  }
+
+  Future<void> _initSession() async {
+    final session = await AudioSession.instance;
+    await session.configure(const AudioSessionConfiguration.music());
   }
 
   // Getters
@@ -54,47 +61,84 @@ class MusicPlayerProvider with ChangeNotifier {
   List<Map<String, dynamic>> get playQueue => _playQueue;
 
   void _setupAudioPlayer() {
-    _positionSubscription = _audioPlayer.onPositionChanged.listen((position) {
+    _positionSubscription = _audioPlayer.positionStream.listen((position) {
       _position = position;
       notifyListeners();
     });
 
-    _durationSubscription = _audioPlayer.onDurationChanged.listen((duration) {
-      _duration = duration;
+    _durationSubscription = _audioPlayer.durationStream.listen((duration) {
+      _duration = duration ?? Duration.zero;
       notifyListeners();
     });
 
-    _playerStateSubscription = _audioPlayer.onPlayerStateChanged.listen((state) {
-      _isPlaying = state == PlayerState.playing;
+    _playerStateSubscription = _audioPlayer.playerStateStream.listen((state) {
+      _isPlaying = state.playing;
       notifyListeners();
     });
 
-    _completeSubscription = _audioPlayer.onPlayerComplete.listen((_) {
-      playNext();
+    _sequenceSub = _audioPlayer.sequenceStateStream.listen((sequenceState) {
+      _currentIndex = sequenceState?.currentIndex ?? _currentIndex;
+      if (_currentIndex >= 0 && _currentIndex < _playQueue.length) {
+        _currentlyPlayingPath = _playQueue[_currentIndex]['path'];
+      }
+      notifyListeners();
     });
   }
 
   Future<void> setQueue(List<Map<String, dynamic>> songs, {int initialIndex = 0}) async {
-    // Filter out invalid songs before setting the queue
-    final validSongs = <Map<String, dynamic>>[];
-    for (final song in songs) {
-      if (await _isValidSong(song['path'])) {
-        validSongs.add(song);
+    try {
+      final validSongs = <Map<String, dynamic>>[];
+      for (final song in songs) {
+        final path = song['path'];
+        if (path == null) {
+          print('Warning: Song has no path: $song');
+          continue;
+        }
+        if (await _isValidSong(path)) {
+          validSongs.add(song);
+        } else {
+          print('Warning: Invalid song path: $path');
+        }
       }
+
+      if (validSongs.isEmpty) {
+        print('Error: No valid songs in queue');
+        await stop();
+        notifyListeners();
+        return;
+      }
+
+      _playQueue = validSongs;
+      if (_isShuffleEnabled) {
+        _playQueue.shuffle(Random());
+      }
+
+      _currentIndex = initialIndex < _playQueue.length ? initialIndex : 0;
+
+      final sources = _playQueue.map((song) {
+        final path = song['path'] as String;
+        final thumb = (song['thumbnailUrl'] ?? song['thumbnail_url']);
+        final tag = MediaItem(
+          id: path,
+          title: (song['name'] ?? song['title'] ?? 'Unknown') as String,
+          artist: (song['artist'] ?? 'Unknown Artist') as String,
+          artUri: thumb != null ? Uri.parse(thumb) : null,
+        );
+        final uri = path.startsWith('http') ? Uri.parse(path) : Uri.file(path);
+        return AudioSource.uri(uri, tag: tag);
+      }).toList();
+
+      final playlist = ConcatenatingAudioSource(children: sources);
+      await _audioPlayer.setAudioSource(playlist, initialIndex: _currentIndex);
+      await _audioPlayer.play();
+      print('Successfully set queue with ${_playQueue.length} songs, playing index $_currentIndex');
+      notifyListeners();
+    } catch (e, stackTrace) {
+      print('Error in setQueue: $e');
+      print('Stack trace: $stackTrace');
+      await stop();
+      notifyListeners();
     }
-    
-    _playQueue = validSongs;
-    if (_isShuffleEnabled) {
-      _playQueue.shuffle(Random());
-    }
-    
-    // Adjust initial index if needed
-    _currentIndex = initialIndex < _playQueue.length ? initialIndex : 0;
-    
-    if (_playQueue.isNotEmpty) {
-      await playSong(_playQueue[_currentIndex]['path']);
-    }
-    notifyListeners();
   }
 
   void playYouTubeVideo(YouTubeVideo video, List<YouTubeVideo> queue) {
@@ -106,8 +150,8 @@ class MusicPlayerProvider with ChangeNotifier {
       'thumbnailUrl': v.thumbnailUrl,
     }).toList();
     _currentVideo = video;
-    _currentIndex = _playQueue.indexWhere((s) => s['videoId'] == video.videoId);
-    playSong(_playQueue[_currentIndex]['path']);
+    final idx = _playQueue.indexWhere((s) => s['videoId'] == video.videoId);
+    setQueue(_playQueue, initialIndex: idx >= 0 ? idx : 0);
   }
 
   void toggleShuffle() {
@@ -125,37 +169,65 @@ class MusicPlayerProvider with ChangeNotifier {
 
   Future<void> playSong(String path) async {
     try {
+      print('playSong called with path: $path');
+      
       if (_currentlyPlayingPath == path && _isPlaying) {
+        print('Pausing current song');
         await _audioPlayer.pause();
         notifyListeners();
         return;
       } else if (_currentlyPlayingPath == path && !_isPlaying) {
-        await _audioPlayer.resume();
+        print('Resuming current song');
+        await _audioPlayer.play();
         notifyListeners();
         return;
       }
 
-      _currentlyPlayingPath = path;
-      _currentIndex = _playQueue.indexWhere((s) => s['path'] == path);
-      if (_currentIndex < 0) {
+      final idx = _playQueue.indexWhere((s) => s['path'] == path);
+      print('Song index in queue: $idx, queue length: ${_playQueue.length}');
+      
+      if (idx == -1) {
+        print('Song not in queue, adding it');
         _playQueue.add({'path': path, 'name': path.split('/').last});
-        _currentIndex = _playQueue.length - 1;
+        final song = _playQueue.lastWhere((s) => s['path'] == path, orElse: () => {'name': path.split('/').last});
+        final thumb = (song['thumbnailUrl'] ?? song['thumbnail_url']);
+        final artist = (song['artist'] ?? 'Unknown Artist') as String;
+        final source = AudioSource.uri(
+          path.startsWith('http') ? Uri.parse(path) : Uri.file(path),
+          tag: MediaItem(
+            id: path,
+            title: (song['name'] ?? path.split('/').last) as String,
+            artist: artist,
+            artUri: thumb != null ? Uri.parse(thumb) : null,
+          ),
+        );
+        // Append to current playlist if exists
+        final seq = _audioPlayer.sequence;
+        if (seq != null) {
+          await (_audioPlayer.audioSource as ConcatenatingAudioSource).add(source);
+          _currentIndex = (_audioPlayer.sequence?.length ?? 1) - 1;
+        } else {
+          await _audioPlayer.setAudioSource(ConcatenatingAudioSource(children: [source]));
+          _currentIndex = 0;
+        }
+      } else {
+        print('Song found in queue at index $idx');
+        _currentIndex = idx;
       }
+
+      _currentlyPlayingPath = path;
       _currentVideo = _playQueue[_currentIndex].containsKey('videoId') || _playQueue[_currentIndex].containsKey('video_id')
           ? _currentVideo
           : null;
-      notifyListeners();
 
-      if (path.startsWith('http')) {
-        await _audioPlayer.play(UrlSource(path));
-      } else {
-        await _audioPlayer.play(DeviceFileSource(path));
-      }
-    } catch (e) {
-      // On failure, revert UI state
+      print('Seeking to index $_currentIndex and playing');
+      await _audioPlayer.seek(Duration.zero, index: _currentIndex);
+      await _audioPlayer.play();
+      print('Playback started successfully');
+    } catch (e, stackTrace) {
+      print('Error in playSong: $e');
+      print('Stack trace: $stackTrace');
       _isPlaying = false;
-      // keep _currentlyPlayingPath so user still sees the bar briefly if desired,
-      // or clear it to hide the bar if playback failed. Choose to clear to avoid stale UI.
       _currentlyPlayingPath = null;
       _currentIndex = -1;
       _currentVideo = null;
@@ -175,70 +247,17 @@ class MusicPlayerProvider with ChangeNotifier {
   }
 
   Future<void> playNext() async {
-    if (_playQueue.isEmpty) return;
-    
-    int attempts = 0;
-    int nextIndex = (_currentIndex + 1) % _playQueue.length;
-    
-    // Try to find a valid song, up to the queue length
-    while (attempts < _playQueue.length) {
-      final nextSong = _playQueue[nextIndex];
-      final isValid = await _isValidSong(nextSong['path']);
-      
-      if (isValid) {
-        await playSong(nextSong['path']);
-        return;
-      }
-      
-      // Remove invalid song from queue
-      _playQueue.removeAt(nextIndex);
-      if (_playQueue.isEmpty) {
-        await stop();
-        return;
-      }
-      
-      // Adjust index after removal
-      nextIndex = nextIndex % _playQueue.length;
-      attempts++;
+    if (_audioPlayer.hasNext) {
+      await _audioPlayer.seekToNext();
+      await _audioPlayer.play();
     }
-    
-    // No valid songs found
-    await stop();
   }
 
   Future<void> playPrevious() async {
-    if (_playQueue.isEmpty) return;
-    
-    int attempts = 0;
-    int prevIndex = _currentIndex <= 0 ? _playQueue.length - 1 : _currentIndex - 1;
-    
-    // Try to find a valid song, up to the queue length
-    while (attempts < _playQueue.length) {
-      final prevSong = _playQueue[prevIndex];
-      final isValid = await _isValidSong(prevSong['path']);
-      
-      if (isValid) {
-        await playSong(prevSong['path']);
-        return;
-      }
-      
-      // Remove invalid song from queue
-      _playQueue.removeAt(prevIndex);
-      if (_playQueue.isEmpty) {
-        await stop();
-        return;
-      }
-      
-      // Adjust index after removal
-      if (prevIndex >= _playQueue.length) {
-        prevIndex = _playQueue.length - 1;
-      }
-      prevIndex = prevIndex <= 0 ? _playQueue.length - 1 : prevIndex - 1;
-      attempts++;
+    if (_audioPlayer.hasPrevious) {
+      await _audioPlayer.seekToPrevious();
+      await _audioPlayer.play();
     }
-    
-    // No valid songs found
-    await stop();
   }
 
   Future<void> stop() async {
@@ -250,12 +269,16 @@ class MusicPlayerProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> seek(Duration position) async {
+    await _audioPlayer.seek(position);
+  }
+
   @override
   void dispose() {
     _positionSubscription?.cancel();
     _durationSubscription?.cancel();
     _playerStateSubscription?.cancel();
-    _completeSubscription?.cancel();
+    _sequenceSub?.cancel();
     _audioPlayer.dispose();
     super.dispose();
   }
