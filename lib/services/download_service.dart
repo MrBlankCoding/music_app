@@ -23,8 +23,9 @@ class DownloadService with ChangeNotifier {
   }
 
   String? _downloadDirectory;
-  final String _serverUrl = 'http://localhost:8000'; 
-
+  final String _serverUrl = 'https://hurt-denni-mrblankcoding-605d0a56.koyeb.app';
+  // http://127.0.0.1:8000
+  // https://hurt-denni-mrblankcoding-605d0a56.koyeb.app
   final Queue<YouTubeVideo> _downloadQueue = Queue<YouTubeVideo>();
   final Map<String, double> _downloadProgress = {};
   final Map<String, Map<String, dynamic>> _downloadDetails = {};
@@ -175,8 +176,8 @@ class DownloadService with ChangeNotifier {
                 developer.log('Download completed on server: $serverPath',
                     name: 'DownloadService');
                 
-                // Now download the file from server
-                final fileUrl = '$_serverUrl/download/?video_id=${video.videoId}';
+                // Now download the file from server using the download-file endpoint
+                final fileUrl = '$_serverUrl/download-file/${video.videoId}';
                 final fileResponse = await http.get(Uri.parse(fileUrl));
                 
                 if (fileResponse.statusCode == 200) {
