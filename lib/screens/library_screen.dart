@@ -2,203 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/library_provider.dart';
 import '../providers/music_player_provider.dart';
-import '../providers/playlist_provider.dart';
-import '../models/playlist.dart';
 import '../widgets/song_card.dart';
+import '../widgets/playlist_dialogs.dart';
+import '../services/song_management_service.dart';
 
 class LibraryScreen extends StatelessWidget {
   const LibraryScreen({super.key});
-
-  Future<void> _showAddToPlaylistDialog(
-    BuildContext context,
-    Map<String, dynamic> song,
-  ) async {
-    final playlistProvider = context.read<PlaylistProvider>();
-    await playlistProvider.loadPlaylists();
-
-    if (!context.mounted) return;
-
-    if (playlistProvider.playlists.isEmpty) {
-      final createNew = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('No Playlists'),
-          content: const Text(
-            'You don\'t have any playlists yet. Would you like to create one?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Create Playlist'),
-            ),
-          ],
-        ),
-      );
-
-      if (context.mounted && createNew == true) {
-        await _showCreatePlaylistDialog(context, song);
-      }
-      return;
-    }
-
-    final selectedPlaylist = await showDialog<Playlist>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add to Playlist'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: playlistProvider.playlists.length + 1,
-            itemBuilder: (context, index) {
-              if (index == playlistProvider.playlists.length) {
-                return ListTile(
-                  leading: const Icon(Icons.add),
-                  title: const Text('Create New Playlist'),
-                  onTap: () => Navigator.pop(context),
-                );
-              }
-              final playlist = playlistProvider.playlists[index];
-              return ListTile(
-                leading: const Icon(Icons.playlist_play),
-                title: Text(playlist.name),
-                subtitle: Text('${playlist.songCount} songs'),
-                onTap: () => Navigator.pop(context, playlist),
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    );
-
-    if (selectedPlaylist != null) {
-      try {
-        await playlistProvider.addSongToPlaylist(selectedPlaylist.id, song);
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Added to "${selectedPlaylist.name}"')),
-          );
-        }
-      } catch (e) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Error: $e')));
-        }
-      }
-    } else if (context.mounted) {
-      await _showCreatePlaylistDialog(context, song);
-    }
-  }
-
-  Future<void> _showCreatePlaylistDialog(
-    BuildContext context,
-    Map<String, dynamic> song,
-  ) async {
-    final nameController = TextEditingController();
-    final descriptionController = TextEditingController();
-    final playlistProvider = context.read<PlaylistProvider>();
-
-    if (!context.mounted) return;
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Create Playlist'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'Playlist Name',
-                border: OutlineInputBorder(),
-              ),
-              autofocus: true,
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: descriptionController,
-              decoration: const InputDecoration(
-                labelText: 'Description (optional)',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 2,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Create'),
-          ),
-        ],
-      ),
-    );
-
-    if (result == true && nameController.text.isNotEmpty) {
-      try {
-        final playlist = await playlistProvider.createPlaylist(
-          nameController.text,
-          description: descriptionController.text.isEmpty
-              ? null
-              : descriptionController.text,
-        );
-        if (context.mounted && playlist != null) {
-          await playlistProvider.addSongToPlaylist(playlist.id, song);
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Created "${playlist.name}" and added song'),
-              ),
-            );
-          }
-        }
-      } catch (e) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Error: $e')));
-        }
-      }
-    }
-  }
-
-  Future<void> _deleteSong(
-    BuildContext context,
-    Map<String, dynamic> song,
-  ) async {
-    if (!context.mounted) return;
-
-    final musicPlayerProvider = context.read<MusicPlayerProvider>();
-    final libraryProvider = context.read<LibraryProvider>();
-    final playlistProvider = context.read<PlaylistProvider>();
-
-    if (musicPlayerProvider.currentSong?['path'] == song['path']) {
-      await musicPlayerProvider.stop();
-    }
-    await libraryProvider.deleteSong(song['path']);
-    await playlistProvider.removeSongFromAllPlaylists(song['path']);
-    await libraryProvider.loadSongs();
-  }
 
   @override
   Widget build(BuildContext context) {
     final libraryProvider = context.watch<LibraryProvider>();
     final musicPlayerProvider = context.watch<MusicPlayerProvider>();
+    final songManagementService = SongManagementService(context);
 
     return Column(
       children: [
@@ -245,7 +60,7 @@ class LibraryScreen extends StatelessWidget {
                             deleteConfirmMessage:
                                 'Delete this song from your library? This action cannot be undone.',
                             onDelete: () async {
-                              await _deleteSong(context, song);
+                              await songManagementService.deleteSong(song['path']);
                             },
                             onTap: () async {
                               if (musicPlayerProvider.currentSong?['path'] !=
@@ -277,7 +92,7 @@ class LibraryScreen extends StatelessWidget {
                                   title: const Text('Add to Playlist'),
                                   contentPadding: EdgeInsets.zero,
                                 ),
-                                onTap: () => _showAddToPlaylistDialog(context, song),
+                                onTap: () => PlaylistDialogs.showAddToPlaylistDialog(context, song),
                               ),
                               PopupMenuItem<String>(
                                 value: 'delete',
@@ -294,7 +109,7 @@ class LibraryScreen extends StatelessWidget {
                                   ),
                                   contentPadding: EdgeInsets.zero,
                                 ),
-                                onTap: () => _deleteSong(context, song),
+                                onTap: () => songManagementService.deleteSong(song['path']),
                               ),
                             ],
                           );

@@ -106,8 +106,8 @@ class _FullPlayerScreenState extends State<FullPlayerScreen>
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                           colors: [
-                            Colors.black.withOpacity(0.2),
-                            Colors.black.withOpacity(0.6),
+                            Colors.black.withValues(alpha: 0.2),
+                            Colors.black.withValues(alpha: 0.6),
                           ],
                         ),
                       ),
@@ -192,9 +192,9 @@ class _FullPlayerScreenState extends State<FullPlayerScreen>
                         center: Alignment.topCenter,
                         radius: 1.5,
                         colors: [
-                          Colors.black.withOpacity(0.3),
-                          Colors.black.withOpacity(0.75),
-                          Colors.black.withOpacity(0.95),
+                          Colors.black.withValues(alpha: 0.3),
+                          Colors.black.withValues(alpha: 0.75),
+                          Colors.black.withValues(alpha: 0.95),
                         ],
                         stops: const [0.0, 0.6, 1.0],
                       ),
@@ -219,7 +219,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen>
             height: 5,
             margin: const EdgeInsets.only(bottom: 12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.4),
+              color: Colors.white.withValues(alpha: 0.4),
               borderRadius: BorderRadius.circular(3),
             ),
           ),
@@ -261,20 +261,20 @@ class _FullPlayerScreenState extends State<FullPlayerScreen>
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.white.withOpacity(0.15),
+                    color: Colors.white.withValues(alpha: 0.15),
                     blurRadius: 50,
                     spreadRadius: isPlaying ? 8 : 0,
                   ),
                   BoxShadow(
                     color: Theme.of(
                       context,
-                    ).colorScheme.primary.withOpacity(0.3),
+                    ).colorScheme.primary.withValues(alpha: 0.3),
                     blurRadius: 40,
                     spreadRadius: 5,
                     offset: const Offset(0, 15),
                   ),
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.5),
+                    color: Colors.black.withValues(alpha: 0.5),
                     blurRadius: 30,
                     offset: const Offset(0, 20),
                   ),
@@ -309,7 +309,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen>
           ],
         ),
       ),
-      child: Icon(icon, size: 100, color: Colors.white.withOpacity(0.5)),
+      child: Icon(icon, size: 100, color: Colors.white.withValues(alpha: 0.5)),
     );
   }
 
@@ -332,15 +332,15 @@ class _FullPlayerScreenState extends State<FullPlayerScreen>
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.12),
+            color: Colors.white.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withOpacity(0.2)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
           ),
           child: Text(
             artist,
             style: TextStyle(
               fontSize: 15,
-              color: Colors.white.withOpacity(0.85),
+              color: Colors.white.withValues(alpha: 0.85),
             ),
           ),
         ),
@@ -374,9 +374,9 @@ class _FullPlayerScreenState extends State<FullPlayerScreen>
                   data: SliderTheme.of(context).copyWith(
                     trackHeight: 4,
                     activeTrackColor: Colors.white,
-                    inactiveTrackColor: Colors.white.withOpacity(0.2),
+                    inactiveTrackColor: Colors.white.withValues(alpha: 0.2),
                     thumbColor: Colors.white,
-                    overlayColor: Colors.white.withOpacity(0.2),
+                    overlayColor: Colors.white.withValues(alpha: 0.2),
                     thumbShape: const RoundSliderThumbShape(
                       enabledThumbRadius: 8,
                     ),
@@ -422,14 +422,14 @@ class _FullPlayerScreenState extends State<FullPlayerScreen>
                         _formatDuration(displayPosition),
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.white.withOpacity(0.7),
+                          color: Colors.white.withValues(alpha: 0.7),
                         ),
                       ),
                       Text(
                         _formatDuration(duration),
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.white.withOpacity(0.7),
+                          color: Colors.white.withValues(alpha: 0.7),
                         ),
                       ),
                     ],
@@ -474,12 +474,12 @@ class _FullPlayerScreenState extends State<FullPlayerScreen>
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.white.withOpacity(0.5),
+            color: Colors.white.withValues(alpha: 0.5),
             blurRadius: 25,
             spreadRadius: 5,
           ),
           BoxShadow(
-            color: Colors.black.withOpacity(0.3),
+            color: Colors.black.withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -509,8 +509,8 @@ class _FullPlayerScreenState extends State<FullPlayerScreen>
       height: 54,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: Colors.white.withOpacity(0.12),
-        border: Border.all(color: Colors.white.withOpacity(0.2)),
+        color: Colors.white.withValues(alpha: 0.12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
       ),
       child: Material(
         color: Colors.transparent,
@@ -544,9 +544,9 @@ class _FullPlayerScreenState extends State<FullPlayerScreen>
           padding: const EdgeInsets.all(8),
           decoration: isActive
               ? BoxDecoration(
-                  color: Colors.white.withOpacity(0.15),
+                  color: Colors.white.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.white.withOpacity(0.3)),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
                 )
               : null,
           child: Icon(icon, size: size, color: Colors.white),

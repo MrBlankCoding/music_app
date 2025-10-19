@@ -4,109 +4,14 @@ import 'package:provider/provider.dart';
 import '../providers/playlist_provider.dart';
 import '../providers/library_provider.dart';
 import '../models/playlist.dart';
+import '../widgets/playlist_dialogs.dart';
 import 'playlist_detail_screen.dart';
-
-/// Utility class for playlist-related dialogs
-class _PlaylistDialogs {
-  /// Shows a dialog to create a new playlist
-  static Future<Map<String, String>?> showCreateDialog(
-    BuildContext context,
-  ) async {
-    final nameController = TextEditingController();
-    final descriptionController = TextEditingController();
-
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Create Playlist'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'Playlist Name',
-                border: OutlineInputBorder(),
-              ),
-              autofocus: true,
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: descriptionController,
-              decoration: const InputDecoration(
-                labelText: 'Description (optional)',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 2,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Create'),
-          ),
-        ],
-      ),
-    );
-
-    Map<String, String>? returnValue;
-    if (result == true && nameController.text.isNotEmpty) {
-      returnValue = {
-        'name': nameController.text,
-        'description': descriptionController.text,
-      };
-    }
-
-    nameController.dispose();
-    descriptionController.dispose();
-    return returnValue;
-  }
-
-  /// Shows a confirmation dialog for deleting a playlist
-  static Future<bool> showDeleteConfirmation(
-    BuildContext context,
-    String playlistName,
-  ) async {
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Playlist'),
-        content: Text('Delete "$playlistName"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-    return result ?? false;
-  }
-}
 
 class PlaylistsScreen extends StatelessWidget {
   const PlaylistsScreen({super.key});
 
   Future<void> _showCreatePlaylistDialog(BuildContext context) async {
-    final data = await _PlaylistDialogs.showCreateDialog(context);
-    if (data != null && context.mounted) {
-      await context.read<PlaylistProvider>().createPlaylist(
-        data['name']!,
-        description: data['description']!.isEmpty ? null : data['description'],
-      );
-    }
+    await PlaylistDialogs.showCreatePlaylistDialog(context);
   }
 
   @override
@@ -117,8 +22,8 @@ class PlaylistsScreen extends StatelessWidget {
       body: playlistProvider.isLoading
           ? const Center(child: CircularProgressIndicator())
           : playlistProvider.playlists.isEmpty
-          ? _buildEmptyState(context)
-          : _buildPlaylistGrid(context, playlistProvider),
+              ? _buildEmptyState(context)
+              : _buildPlaylistGrid(context, playlistProvider),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showCreatePlaylistDialog(context),
         icon: const Icon(Icons.add),
@@ -146,8 +51,8 @@ class PlaylistsScreen extends StatelessWidget {
           Text(
             'Make a playlist!',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
           ),
         ],
       ),
@@ -170,7 +75,7 @@ class PlaylistsScreen extends StatelessWidget {
             direction: DismissDirection.endToStart,
             background: _buildDismissBackground(context),
             confirmDismiss: (_) =>
-                _PlaylistDialogs.showDeleteConfirmation(context, playlist.name),
+                PlaylistDialogs.showDeletePlaylistConfirmationDialog(context, playlist.name),
             onDismissed: (_) =>
                 _handlePlaylistDismissed(context, playlistProvider, playlist),
             child: _PlaylistCard(
@@ -272,7 +177,7 @@ class _PlaylistArtwork extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       boxShadow: [
         BoxShadow(
-          color: Theme.of(context).shadowColor.withOpacity(0.1),
+          color: Theme.of(context).shadowColor.withAlpha(25),
           blurRadius: 8,
           offset: const Offset(0, 2),
         ),
@@ -451,8 +356,6 @@ class _PlaylistInfo extends StatelessWidget {
           children: [
             Icon(
               Icons.music_note,
-              size: 16,
-              color: Theme.of(context).colorScheme.primary,
             ),
             const SizedBox(width: 4),
             Text(

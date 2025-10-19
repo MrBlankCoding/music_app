@@ -6,6 +6,8 @@ import '../providers/library_provider.dart';
 import '../models/playlist.dart';
 import '../widgets/song_card.dart';
 import '../widgets/playback_bar.dart';
+import '../widgets/playlist_dialogs.dart';
+import '../services/song_management_service.dart';
 import 'home_screen.dart';
 import '../utils/song_data_helper.dart';
 
@@ -27,123 +29,6 @@ class PlaylistDetailScreen extends StatelessWidget {
       await musicPlayerProvider.stop();
     }
     await playlistProvider.removeSongFromPlaylist(playlistId, songPath);
-  }
-
-  Future<void> _editPlaylist(BuildContext context, Playlist playlist) async {
-    final nameController = TextEditingController(text: playlist.name);
-    final descriptionController = TextEditingController(
-      text: playlist.description ?? '',
-    );
-
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Edit Playlist'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'Playlist Name',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: descriptionController,
-              decoration: const InputDecoration(
-                labelText: 'Description (optional)',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 2,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-
-    if (result == true && nameController.text.isNotEmpty && context.mounted) {
-      final updatedPlaylist = playlist.copyWith(
-        name: nameController.text,
-        description: descriptionController.text.isEmpty
-            ? null
-            : descriptionController.text,
-      );
-      await context.read<PlaylistProvider>().updatePlaylist(updatedPlaylist);
-    }
-
-    nameController.dispose();
-    descriptionController.dispose();
-  }
-
-  List<Map<String, dynamic>> _getSongsWithMetadata(
-    Playlist playlist,
-    LibraryProvider libraryProvider,
-  ) {
-    // Reconcile playlist songs with current library to handle path changes
-    // (e.g., when app is reinstalled and container path changes)
-    final List<Map<String, dynamic>> reconciledSongs = [];
-
-    for (final song in playlist.songs) {
-      final storedPath = song['path'] as String?;
-      if (storedPath == null) continue;
-
-      // Extract filename from stored path
-      final filename = storedPath.split('/').last;
-
-      // Try to find matching song in current library by filename
-      final librarySong = libraryProvider.songs.firstWhere(
-        (s) => (s['path'] as String).split('/').last == filename,
-        orElse: () => <String, dynamic>{},
-      );
-
-      Map<String, dynamic> songCopy;
-
-      if (librarySong.isNotEmpty) {
-        // Use current library song (has correct path)
-        songCopy = Map<String, dynamic>.from(librarySong);
-      } else {
-        // Library song not found, use stored metadata but keep old path
-        final songData = SongData(song);
-        songCopy = <String, dynamic>{
-          'path': storedPath,
-          'name': songData.title,
-          'artist': songData.artist,
-          'size': song['size'] ?? 0,
-          'thumbnailUrl': songData.thumbnailUrl,
-          'title': songData.title,
-          'video_id': song['video_id'],
-        };
-
-        // Parse DateTime if it's stored as a string
-        if (song['modified'] is String) {
-          try {
-            songCopy['modified'] = DateTime.parse(song['modified'] as String);
-          } catch (e) {
-            songCopy['modified'] = DateTime.now();
-          }
-        } else if (song['modified'] is DateTime) {
-          songCopy['modified'] = song['modified'];
-        } else {
-          songCopy['modified'] = DateTime.now();
-        }
-      }
-
-      reconciledSongs.add(songCopy);
-    }
-
-    return reconciledSongs;
   }
 
   Future<void> _handleSongTap(
@@ -299,6 +184,7 @@ class PlaylistDetailScreen extends StatelessWidget {
     final playlistProvider = context.watch<PlaylistProvider>();
     final musicPlayerProvider = context.watch<MusicPlayerProvider>();
     final libraryProvider = context.watch<LibraryProvider>();
+    final songManagementService = SongManagementService(context);
     final playlist = playlistProvider.getPlaylistById(playlistId);
 
     if (playlist == null) {
@@ -308,7 +194,7 @@ class PlaylistDetailScreen extends StatelessWidget {
       );
     }
 
-    final songs = _getSongsWithMetadata(playlist, libraryProvider);
+    final songs = songManagementService.getReconciledPlaylistSongs(playlist);
 
     return Scaffold(
       appBar: AppBar(
@@ -316,7 +202,7 @@ class PlaylistDetailScreen extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
-            onPressed: () => _editPlaylist(context, playlist),
+            onPressed: () => PlaylistDialogs.showEditPlaylistDialog(context, playlist),
           ),
         ],
       ),
@@ -395,11 +281,7 @@ class PlaylistDetailScreen extends StatelessWidget {
                               contentPadding: EdgeInsets.zero,
                             ),
                             onTap: () {
-                              Future.delayed(
-                                const Duration(milliseconds: 100),
-                                () =>
-                                    _removeSongFromPlaylist(context, songPath),
-                              );
+                              _removeSongFromPlaylist(context, songPath);
                             },
                           ),
                         ],
