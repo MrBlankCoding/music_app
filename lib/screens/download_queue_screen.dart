@@ -68,9 +68,7 @@ class _DownloadQueueScreenState extends State<DownloadQueueScreen> {
     final downloadService = context.watch<DownloadService>();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Download Queue'),
-      ),
+      appBar: AppBar(title: const Text('Download Queue')),
       body: ListView.builder(
         itemCount: downloadService.downloadQueue.length,
         itemBuilder: (context, index) {
@@ -114,7 +112,9 @@ class _DownloadQueueScreenState extends State<DownloadQueueScreen> {
                           _getProgressText(progress, details),
                           style: TextStyle(
                             fontSize: 12,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                         ),
                         if (details != null &&
@@ -124,7 +124,9 @@ class _DownloadQueueScreenState extends State<DownloadQueueScreen> {
                             _formatSpeed(details['speed']),
                             style: TextStyle(
                               fontSize: 12,
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                             ),
                           ),
                       ],
@@ -138,7 +140,9 @@ class _DownloadQueueScreenState extends State<DownloadQueueScreen> {
                           'ETA: ${_formatEta(details['eta'])}',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ),

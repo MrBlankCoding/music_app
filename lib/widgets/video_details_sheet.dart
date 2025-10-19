@@ -34,17 +34,17 @@ class _VideoDetailsSheetState extends State<VideoDetailsSheet> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Downloaded')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Downloaded')));
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isDownloading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -78,10 +78,7 @@ class _VideoDetailsSheetState extends State<VideoDetailsSheet> {
           const SizedBox(height: 16),
           Text(
             widget.video.title,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
@@ -94,7 +91,9 @@ class _VideoDetailsSheetState extends State<VideoDetailsSheet> {
           ),
           const SizedBox(height: 16),
           if (_isDownloading) ...[
-            LinearProgressIndicator(value: _downloadProgress > 0 ? _downloadProgress : null),
+            LinearProgressIndicator(
+              value: _downloadProgress > 0 ? _downloadProgress : null,
+            ),
             const SizedBox(height: 8),
             Text('${(_downloadProgress * 100).toInt()}%'),
             const SizedBox(height: 16),

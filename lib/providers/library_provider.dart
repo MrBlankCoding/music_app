@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import '../services/download_service.dart';
 
@@ -13,7 +12,7 @@ enum SortOrder {
 
 class LibraryProvider with ChangeNotifier {
   final DownloadService _downloadService = DownloadService();
-  
+
   List<Map<String, dynamic>> _songs = [];
   bool _isLoading = true;
   SortOrder _sortOrder = SortOrder.dateNewest;
@@ -25,8 +24,10 @@ class LibraryProvider with ChangeNotifier {
 
     if (_filterQuery.isNotEmpty) {
       filteredSongs = filteredSongs
-          .where((song) =>
-              song['name'].toLowerCase().contains(_filterQuery.toLowerCase()))
+          .where(
+            (song) =>
+                song['name'].toLowerCase().contains(_filterQuery.toLowerCase()),
+          )
           .toList();
     }
 
@@ -38,21 +39,32 @@ class LibraryProvider with ChangeNotifier {
         filteredSongs.sort((a, b) => b['name'].compareTo(a['name']));
         break;
       case SortOrder.dateNewest:
-        filteredSongs.sort((a, b) => (b['modified'] as DateTime).compareTo(a['modified'] as DateTime));
+        filteredSongs.sort(
+          (a, b) =>
+              (b['modified'] as DateTime).compareTo(a['modified'] as DateTime),
+        );
         break;
       case SortOrder.dateOldest:
-        filteredSongs.sort((a, b) => (a['modified'] as DateTime).compareTo(b['modified'] as DateTime));
+        filteredSongs.sort(
+          (a, b) =>
+              (a['modified'] as DateTime).compareTo(b['modified'] as DateTime),
+        );
         break;
       case SortOrder.sizeLargest:
-        filteredSongs.sort((a, b) => (b['size'] as int).compareTo(a['size'] as int));
+        filteredSongs.sort(
+          (a, b) => (b['size'] as int).compareTo(a['size'] as int),
+        );
         break;
       case SortOrder.sizeSmallest:
-        filteredSongs.sort((a, b) => (a['size'] as int).compareTo(b['size'] as int));
+        filteredSongs.sort(
+          (a, b) => (a['size'] as int).compareTo(b['size'] as int),
+        );
         break;
     }
 
     return filteredSongs;
   }
+
   bool get isLoading => _isLoading;
   SortOrder get sortOrder => _sortOrder;
 

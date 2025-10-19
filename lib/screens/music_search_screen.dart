@@ -1,4 +1,3 @@
-
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -74,37 +73,37 @@ class _MusicSearchScreenState extends State<MusicSearchScreen> {
           child: searchProvider.isLoading
               ? const Center(child: CircularProgressIndicator())
               : (_searchController.text.trim().isEmpty &&
-                      searchProvider.recentSearches.isNotEmpty)
-                  ? ListView(
-                      children: [
-                        ListTile(
-                          title: const Text('Recent searches'),
-                          trailing: TextButton(
-                            onPressed: () => searchProvider.clearRecentSearches(),
-                            child: const Text('Clear'),
-                          ),
-                        ),
-                        const Divider(height: 0),
-                        ...searchProvider.recentSearches.map(
-                          (q) => ListTile(
-                            leading: const Icon(Icons.history),
-                            title: Text(q),
-                            onTap: () {
-                              _searchController.text = q;
-                              searchProvider.search(q);
-                            },
-                          ),
-                        ),
-                      ],
-                    )
-                  : searchProvider.videos.isEmpty
-                      ? const Center(child: Text('No results'))
-                      : ListView.builder(
-                          itemCount: searchProvider.videos.length,
-                          itemBuilder: (context, index) {
-                            return MusicCard(video: searchProvider.videos[index]);
-                          },
-                        ),
+                    searchProvider.recentSearches.isNotEmpty)
+              ? ListView(
+                  children: [
+                    ListTile(
+                      title: const Text('Recent searches'),
+                      trailing: TextButton(
+                        onPressed: () => searchProvider.clearRecentSearches(),
+                        child: const Text('Clear'),
+                      ),
+                    ),
+                    const Divider(height: 0),
+                    ...searchProvider.recentSearches.map(
+                      (q) => ListTile(
+                        leading: const Icon(Icons.history),
+                        title: Text(q),
+                        onTap: () {
+                          _searchController.text = q;
+                          searchProvider.search(q);
+                        },
+                      ),
+                    ),
+                  ],
+                )
+              : searchProvider.videos.isEmpty
+              ? const Center(child: Text('No results'))
+              : ListView.builder(
+                  itemCount: searchProvider.videos.length,
+                  itemBuilder: (context, index) {
+                    return MusicCard(video: searchProvider.videos[index]);
+                  },
+                ),
         ),
       ],
     );

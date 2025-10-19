@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:just_audio_background/just_audio_background.dart';
+import '../providers/music_player_provider.dart';
+import '../utils/song_data_helper.dart';
 
 class SongCard extends StatelessWidget {
   final Map<String, dynamic> song;
@@ -31,23 +37,21 @@ class SongCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final songPath = song['path'] as String;
-    final thumbnailUrl = song['thumbnail_url'] as String?;
-    final artist = song['artist'] as String? ?? 'Unknown Artist';
-    final title = song['title'] as String? ?? song['name'] as String;
+    final songData = SongData(song);
+    final songPath = songData.path;
+    final thumbnailUrl = songData.thumbnailUrl;
+    final artist = songData.artist;
+    final title = songData.title;
 
     final cardWidget = Card(
       key: cardKey,
-      margin: const EdgeInsets.symmetric(
-        horizontal: 4,
-        vertical: 6,
-      ),
+      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
       elevation: isPlaying ? 4 : 1,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: isPlaying
             ? BorderSide(
-                color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+                color: Theme.of(context).colorScheme.primary.withAlpha(128),
                 width: 2,
               )
             : BorderSide.none,
@@ -73,19 +77,17 @@ class SongCard extends StatelessWidget {
                     index: reorderIndex!,
                     child: Icon(
                       Icons.drag_handle,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurfaceVariant
-                          .withOpacity(0.5),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurfaceVariant.withAlpha(128),
                     ),
                   )
                 else
                   Icon(
                     Icons.drag_handle,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurfaceVariant
-                        .withOpacity(0.5),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurfaceVariant.withAlpha(128),
                   ),
                 const SizedBox(width: 8),
               ],
@@ -97,10 +99,12 @@ class SongCard extends StatelessWidget {
                   height: showDragHandle ? 56 : 64,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(8),
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
                     boxShadow: [
                       BoxShadow(
-                        color: Theme.of(context).shadowColor.withOpacity(0.1),
+                        color: Theme.of(context).shadowColor.withAlpha(25),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
@@ -108,26 +112,11 @@ class SongCard extends StatelessWidget {
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: thumbnailUrl != null
-                        ? Image.network(
-                            thumbnailUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Icon(
-                                Icons.music_note,
-                                size: showDragHandle ? 28 : 32,
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant,
-                              );
-                            },
-                          )
-                        : Icon(
-                            Icons.music_note,
-                            size: showDragHandle ? 28 : 32,
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
+                    child: _buildAlbumArtImage(
+                      context,
+                      thumbnailUrl,
+                      showDragHandle,
+                    ),
                   ),
                 ),
               ),
@@ -151,12 +140,11 @@ class SongCard extends StatelessWidget {
                         Expanded(
                           child: Text(
                             title,
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
+                            style: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(
-                                  fontWeight:
-                                      isPlaying ? FontWeight.w600 : FontWeight.w500,
+                                  fontWeight: isPlaying
+                                      ? FontWeight.w600
+                                      : FontWeight.w500,
                                   color: isPlaying
                                       ? Theme.of(context).colorScheme.primary
                                       : null,
@@ -170,12 +158,9 @@ class SongCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       artist,
-                      style:
-                          Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant,
-                              ),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -220,19 +205,12 @@ class SongCard extends StatelessWidget {
         background: Container(
           alignment: Alignment.centerRight,
           padding: const EdgeInsets.only(right: 20),
-          margin: const EdgeInsets.symmetric(
-            horizontal: 4,
-            vertical: 6,
-          ),
+          margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.error,
             borderRadius: BorderRadius.circular(12),
           ),
-          child: const Icon(
-            Icons.delete,
-            color: Colors.white,
-            size: 32,
-          ),
+          child: const Icon(Icons.delete, color: Colors.white, size: 32),
         ),
         confirmDismiss: (direction) async {
           HapticFeedback.mediumImpact();
@@ -240,7 +218,10 @@ class SongCard extends StatelessWidget {
             context: context,
             builder: (context) => AlertDialog(
               title: const Text('Delete Song'),
-              content: Text(deleteConfirmMessage ?? 'Are you sure you want to delete this song?'),
+              content: Text(
+                deleteConfirmMessage ??
+                    'Are you sure you want to delete this song?',
+              ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context, false),
@@ -263,5 +244,52 @@ class SongCard extends StatelessWidget {
     }
 
     return cardWidget;
+  }
+
+  Widget _buildAlbumArtImage(
+    BuildContext context,
+    String? thumbnailUrl,
+    bool compact,
+  ) {
+    final musicPlayerProvider = context.watch<MusicPlayerProvider>();
+    if (isPlaying) {
+      return StreamBuilder<SequenceState?>(
+        stream: musicPlayerProvider.sequenceStateStream,
+        builder: (context, snapshot) {
+          final mediaItem = snapshot.data?.currentSource?.tag as MediaItem?;
+          final effectiveUrl = mediaItem?.artUri?.toString() ?? thumbnailUrl;
+          return _buildAlbumArtFromUrl(context, effectiveUrl, compact);
+        },
+      );
+    }
+
+    return _buildAlbumArtFromUrl(context, thumbnailUrl, compact);
+  }
+
+  Widget _buildAlbumArtFromUrl(
+    BuildContext context,
+    String? url,
+    bool compact,
+  ) {
+    if (url != null && url.isNotEmpty) {
+      return CachedNetworkImage(
+        imageUrl: url,
+        fit: BoxFit.cover,
+        placeholder: (context, _) => Container(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        ),
+        errorWidget: (context, __, ___) => Icon(
+          Icons.music_note,
+          size: compact ? 28 : 32,
+          color: Theme.of(context).colorScheme.onSurfaceVariant.withAlpha(153),
+        ),
+      );
+    }
+
+    return Icon(
+      Icons.music_note,
+      size: compact ? 28 : 32,
+      color: Theme.of(context).colorScheme.onSurfaceVariant.withAlpha(153),
+    );
   }
 }

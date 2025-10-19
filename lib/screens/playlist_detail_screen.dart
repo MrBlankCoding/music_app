@@ -7,6 +7,7 @@ import '../models/playlist.dart';
 import '../widgets/song_card.dart';
 import '../widgets/playback_bar.dart';
 import 'home_screen.dart';
+import '../utils/song_data_helper.dart';
 
 class PlaylistDetailScreen extends StatelessWidget {
   final String playlistId;
@@ -18,11 +19,11 @@ class PlaylistDetailScreen extends StatelessWidget {
     String songPath,
   ) async {
     if (!context.mounted) return;
-    
+
     final musicPlayerProvider = context.read<MusicPlayerProvider>();
     final playlistProvider = context.read<PlaylistProvider>();
 
-    if (musicPlayerProvider.currentlyPlayingPath == songPath) {
+    if (musicPlayerProvider.currentSong?['path'] == songPath) {
       await musicPlayerProvider.stop();
     }
     await playlistProvider.removeSongFromPlaylist(playlistId, songPath);
@@ -93,37 +94,38 @@ class PlaylistDetailScreen extends StatelessWidget {
     // Reconcile playlist songs with current library to handle path changes
     // (e.g., when app is reinstalled and container path changes)
     final List<Map<String, dynamic>> reconciledSongs = [];
-    
+
     for (final song in playlist.songs) {
       final storedPath = song['path'] as String?;
       if (storedPath == null) continue;
-      
+
       // Extract filename from stored path
       final filename = storedPath.split('/').last;
-      
+
       // Try to find matching song in current library by filename
       final librarySong = libraryProvider.songs.firstWhere(
         (s) => (s['path'] as String).split('/').last == filename,
         orElse: () => <String, dynamic>{},
       );
-      
+
       Map<String, dynamic> songCopy;
-      
+
       if (librarySong.isNotEmpty) {
         // Use current library song (has correct path)
         songCopy = Map<String, dynamic>.from(librarySong);
       } else {
         // Library song not found, use stored metadata but keep old path
+        final songData = SongData(song);
         songCopy = <String, dynamic>{
           'path': storedPath,
-          'name': song['name'] ?? filename.replaceAll('.mp3', ''),
-          'artist': song['artist'] ?? 'Unknown Artist',
+          'name': songData.title,
+          'artist': songData.artist,
           'size': song['size'] ?? 0,
-          'thumbnail_url': song['thumbnail_url'],
-          'title': song['title'] ?? song['name'] ?? filename.replaceAll('.mp3', ''),
+          'thumbnailUrl': songData.thumbnailUrl,
+          'title': songData.title,
           'video_id': song['video_id'],
         };
-        
+
         // Parse DateTime if it's stored as a string
         if (song['modified'] is String) {
           try {
@@ -137,10 +139,10 @@ class PlaylistDetailScreen extends StatelessWidget {
           songCopy['modified'] = DateTime.now();
         }
       }
-      
+
       reconciledSongs.add(songCopy);
     }
-    
+
     return reconciledSongs;
   }
 
@@ -150,18 +152,23 @@ class PlaylistDetailScreen extends StatelessWidget {
     List<Map<String, dynamic>> songs,
     int index,
   ) async {
-    if (musicPlayerProvider.currentlyPlayingPath != song['path']) {
+    if (musicPlayerProvider.currentSong?['path'] != song['path']) {
       await musicPlayerProvider.setQueue(songs, initialIndex: index);
     } else {
-      await musicPlayerProvider.playSong(song['path'] as String);
+      musicPlayerProvider.playPause();
     }
   }
 
-  Widget _buildPlaylistArtwork(BuildContext context, Playlist playlist, LibraryProvider libraryProvider) {
+  Widget _buildPlaylistArtwork(
+    BuildContext context,
+    Playlist playlist,
+    LibraryProvider libraryProvider,
+  ) {
     final thumbnails = <String>[];
     for (var song in playlist.songs.take(4)) {
-      if (song['thumbnail_url'] != null) {
-        thumbnails.add(song['thumbnail_url'] as String);
+      final songData = SongData(song);
+      if (songData.thumbnailUrl != null) {
+        thumbnails.add(songData.thumbnailUrl!);
       }
     }
 
@@ -183,7 +190,7 @@ class PlaylistDetailScreen extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: Theme.of(context).shadowColor.withOpacity(0.1),
+              color: Theme.of(context).shadowColor.withAlpha(25),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -205,7 +212,7 @@ class PlaylistDetailScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Theme.of(context).shadowColor.withOpacity(0.1),
+              color: Theme.of(context).shadowColor.withAlpha(25),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -238,7 +245,7 @@ class PlaylistDetailScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withAlpha(25),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -261,7 +268,9 @@ class PlaylistDetailScreen extends StatelessWidget {
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) {
                   return Container(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
                     child: Icon(
                       Icons.music_note,
                       size: 24,
@@ -295,9 +304,7 @@ class PlaylistDetailScreen extends StatelessWidget {
     if (playlist == null) {
       return Scaffold(
         appBar: AppBar(),
-        body: const Center(
-          child: Text('Playlist not found.'),
-        ),
+        body: const Center(child: Text('Playlist not found.')),
       );
     }
 
@@ -336,9 +343,7 @@ class PlaylistDetailScreen extends StatelessWidget {
           const SizedBox(height: 8),
           Expanded(
             child: songs.isEmpty
-                ? const Center(
-                    child: Text('No songs in this playlist'),
-                  )
+                ? const Center(child: Text('No songs in this playlist'))
                 : ReorderableListView.builder(
                     padding: const EdgeInsets.only(bottom: 0),
                     itemCount: songs.length,
@@ -346,7 +351,7 @@ class PlaylistDetailScreen extends StatelessWidget {
                       final song = songs[index];
                       final songPath = song['path'] as String;
                       final isPlaying =
-                          musicPlayerProvider.currentlyPlayingPath == songPath;
+                          musicPlayerProvider.currentSong?['path'] == songPath;
 
                       return SongCard(
                         key: ValueKey(songPath),
@@ -356,7 +361,8 @@ class PlaylistDetailScreen extends StatelessWidget {
                         showDragHandle: true,
                         reorderIndex: index,
                         enableSwipeToDelete: true,
-                        deleteConfirmMessage: 'Remove this song from the playlist?',
+                        deleteConfirmMessage:
+                            'Remove this song from the playlist?',
                         onDelete: () async {
                           await _removeSongFromPlaylist(context, songPath);
                         },
@@ -391,7 +397,8 @@ class PlaylistDetailScreen extends StatelessWidget {
                             onTap: () {
                               Future.delayed(
                                 const Duration(milliseconds: 100),
-                                () => _removeSongFromPlaylist(context, songPath),
+                                () =>
+                                    _removeSongFromPlaylist(context, songPath),
                               );
                             },
                           ),
@@ -415,30 +422,7 @@ class PlaylistDetailScreen extends StatelessWidget {
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          PlaybackBar(
-            audioPlayer: musicPlayerProvider.audioPlayer,
-            currentSong: musicPlayerProvider.currentSong,
-            isPlaying: musicPlayerProvider.isPlaying,
-            position: musicPlayerProvider.position,
-            duration: musicPlayerProvider.duration,
-            onPlayPause: () {
-              final path = musicPlayerProvider.currentlyPlayingPath;
-              if (path != null) {
-                musicPlayerProvider.playSong(path);
-              }
-            },
-            onStop: musicPlayerProvider.stop,
-            onNext: musicPlayerProvider.playQueue.length > 1
-                ? musicPlayerProvider.playNext
-                : null,
-            onPrevious: musicPlayerProvider.playQueue.length > 1
-                ? musicPlayerProvider.playPrevious
-                : null,
-            onShuffle: musicPlayerProvider.playQueue.length > 1
-                ? musicPlayerProvider.toggleShuffle
-                : null,
-            isShuffleEnabled: musicPlayerProvider.isShuffleEnabled,
-          ),
+          const PlaybackBar(),
           NavigationBar(
             selectedIndex: 2,
             onDestinationSelected: (index) {

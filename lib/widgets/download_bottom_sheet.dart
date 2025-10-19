@@ -41,8 +41,11 @@ class DownloadBottomSheet extends StatelessWidget {
             const SizedBox(height: 24),
             Consumer<DownloadService>(
               builder: (context, downloadService, child) {
-                final progress = downloadService.downloadProgress[video.videoId];
-                final isQueued = downloadService.downloadQueue.any((v) => v.videoId == video.videoId);
+                final progress =
+                    downloadService.downloadProgress[video.videoId];
+                final isQueued = downloadService.downloadQueue.any(
+                  (v) => v.videoId == video.videoId,
+                );
 
                 if (progress != null) {
                   return Column(

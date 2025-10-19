@@ -1,52 +1,39 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:ui';
+import '../providers/music_player_provider.dart';
+import '../utils/song_data_helper.dart';
 
 class FullPlayerScreen extends StatefulWidget {
-  final AudioPlayer audioPlayer;
-  final Map<String, dynamic> currentSong;
-  final bool isPlaying;
-  final Duration position;
-  final Duration duration;
-  final VoidCallback onPlayPause;
-  final VoidCallback onStop;
-  final VoidCallback? onNext;
-  final VoidCallback? onPrevious;
-  final VoidCallback? onShuffle;
-  final bool isShuffleEnabled;
-
-  const FullPlayerScreen({
-    super.key,
-    required this.audioPlayer,
-    required this.currentSong,
-    required this.isPlaying,
-    required this.position,
-    required this.duration,
-    required this.onPlayPause,
-    required this.onStop,
-    this.onNext,
-    this.onPrevious,
-    this.onShuffle,
-    this.isShuffleEnabled = false,
-  });
+  const FullPlayerScreen({super.key});
 
   @override
   State<FullPlayerScreen> createState() => _FullPlayerScreenState();
 }
 
-class _FullPlayerScreenState extends State<FullPlayerScreen> with TickerProviderStateMixin {
+class _FullPlayerScreenState extends State<FullPlayerScreen>
+    with TickerProviderStateMixin {
   double _dragOffset = 0.0;
   late AnimationController _pulseController;
   late AnimationController _rotationController;
+  bool _isDraggingSlider = false;
+  double _draggedSliderValue = 0.0;
 
   @override
   void initState() {
     super.initState();
-    _pulseController = AnimationController(vsync: this, duration: const Duration(seconds: 3))..repeat(reverse: true);
-    _rotationController = AnimationController(vsync: this, duration: const Duration(seconds: 20));
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    )..repeat(reverse: true);
+    _rotationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 20),
+    );
   }
 
   @override
@@ -54,12 +41,6 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> with TickerProvider
     _pulseController.dispose();
     _rotationController.dispose();
     super.dispose();
-  }
-
-  @override
-  void didUpdateWidget(FullPlayerScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    widget.isPlaying ? _rotationController.repeat() : _rotationController.stop();
   }
 
   void _handleDragEnd(DragEndDetails details) {
@@ -71,30 +52,49 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> with TickerProvider
     }
   }
 
-  String _formatDuration(Duration d) => '${d.inMinutes.remainder(60)}:${d.inSeconds.remainder(60).toString().padLeft(2, '0')}';
+  String _formatDuration(Duration d) {
+    return '${d.inMinutes}:${(d.inSeconds % 60).toString().padLeft(2, '0')}';
+  }
 
   @override
   Widget build(BuildContext context) {
+    final musicPlayerProvider = context.watch<MusicPlayerProvider>();
+    final currentSong = musicPlayerProvider.currentSong;
+
+    if (currentSong == null) {
+      return const Scaffold(body: Center(child: Text('No song selected')));
+    }
+
+    if (musicPlayerProvider.isPlaying) {
+      _rotationController.repeat();
+    } else {
+      _rotationController.stop();
+    }
+
     final scale = 1.0 - (_dragOffset / 1000).clamp(0.0, 0.1);
 
     return Scaffold(
       body: StreamBuilder<SequenceState?>(
-        stream: widget.audioPlayer.sequenceStateStream,
+        stream: musicPlayerProvider.sequenceStateStream,
         builder: (context, seqSnap) {
-          final seq = seqSnap.data;
-          final mediaItem = seq?.currentSource?.tag as MediaItem?;
-
-          final thumbUrl = mediaItem?.artUri?.toString() ??
-              (widget.currentSong['thumbnailUrl'] ?? widget.currentSong['thumbnail_url']);
-          final title = mediaItem?.title ?? (widget.currentSong['name'] ?? '');
-          final artist = mediaItem?.artist ?? (widget.currentSong['artist'] ?? '');
-          final heroId = mediaItem?.id ?? (widget.currentSong['id']?.toString() ?? 'current');
+          final mediaItem = seqSnap.data?.currentSource?.tag as MediaItem?;
+          final songData = SongData(currentSong);
+          final thumbUrl =
+              mediaItem?.artUri?.toString() ?? songData.thumbnailUrl;
+          final title = mediaItem?.title ?? songData.title;
+          final artist = mediaItem?.artist ?? songData.artist;
+          final heroId = mediaItem?.id ?? songData.id;
 
           return Stack(
             children: [
               _buildBackground(thumbUrl),
               GestureDetector(
-                onVerticalDragUpdate: (d) => setState(() => _dragOffset = (_dragOffset + (d.primaryDelta ?? 0)).clamp(0.0, double.infinity)),
+                onVerticalDragUpdate: (d) => setState(() {
+                  _dragOffset = (_dragOffset + (d.primaryDelta ?? 0)).clamp(
+                    0.0,
+                    double.infinity,
+                  );
+                }),
                 onVerticalDragEnd: _handleDragEnd,
                 child: Transform.translate(
                   offset: Offset(0, _dragOffset),
@@ -105,27 +105,39 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> with TickerProvider
                         gradient: LinearGradient(
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
-                          colors: [Colors.black.withOpacity(0.2), Colors.black.withOpacity(0.6)],
+                          colors: [
+                            Colors.black.withOpacity(0.2),
+                            Colors.black.withOpacity(0.6),
+                          ],
                         ),
                       ),
                       child: SafeArea(
                         child: Column(
                           children: [
-                            _buildHeader(),
+                            _buildHeader(musicPlayerProvider),
                             Expanded(
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 28),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    _buildAlbumArt(thumbUrl, heroId),
-                                    const SizedBox(height: 40),
-                                    _buildSongInfo(title, artist),
-                                    const SizedBox(height: 36),
-                                    _buildProgressBar(),
-                                    const SizedBox(height: 28),
-                                    _buildControls(),
-                                  ],
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 28,
+                                ),
+                                child: SingleChildScrollView(
+                                  physics: const BouncingScrollPhysics(),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      _buildAlbumArt(
+                                        thumbUrl,
+                                        heroId,
+                                        musicPlayerProvider.isPlaying,
+                                      ),
+                                      const SizedBox(height: 40),
+                                      _buildSongInfo(title, artist),
+                                      const SizedBox(height: 36),
+                                      _buildProgressBar(musicPlayerProvider),
+                                      const SizedBox(height: 28),
+                                      _buildControls(musicPlayerProvider),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
@@ -154,7 +166,11 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> with TickerProvider
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: const [Color(0xFF0a0e27), Color(0xFF1a1f3a), Color(0xFF2d1b4e)],
+                  colors: const [
+                    Color(0xFF0a0e27),
+                    Color(0xFF1a1f3a),
+                    Color(0xFF2d1b4e),
+                  ],
                   stops: [0.0, 0.5 + _pulseController.value * 0.1, 1.0],
                 ),
               ),
@@ -193,7 +209,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> with TickerProvider
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(MusicPlayerProvider provider) {
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -202,17 +218,25 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> with TickerProvider
             width: 40,
             height: 5,
             margin: const EdgeInsets.only(bottom: 12),
-            decoration: BoxDecoration(color: Colors.white.withOpacity(0.4), borderRadius: BorderRadius.circular(3)),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.4),
+              borderRadius: BorderRadius.circular(3),
+            ),
           ),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _iconButton(Icons.keyboard_arrow_down, () => Navigator.pop(context), size: 32),
-              if (widget.onShuffle != null)
-                _iconButton(Icons.shuffle, widget.onShuffle!, 
-                  isActive: widget.isShuffleEnabled, size: 26)
-              else
-                const SizedBox(width: 40),
+              _iconButton(
+                Icons.keyboard_arrow_down,
+                () => Navigator.pop(context),
+                size: 32,
+              ),
+              _iconButton(
+                Icons.shuffle,
+                provider.toggleShuffle,
+                isActive: provider.isShuffleEnabled,
+                size: 26,
+              ),
             ],
           ),
         ],
@@ -220,16 +244,16 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> with TickerProvider
     );
   }
 
-  Widget _buildAlbumArt(String? thumbUrl, String heroId) {
+  Widget _buildAlbumArt(String? thumbUrl, String heroId, bool isPlaying) {
     final size = MediaQuery.of(context).size.width * 0.72;
     return Hero(
-      tag: 'album_art_${heroId}',
+      tag: 'album_art_$heroId',
       child: AnimatedBuilder(
         animation: _pulseController,
         builder: (context, child) {
           final pulse = 1 + (_pulseController.value * 0.03);
           return Transform.scale(
-            scale: widget.isPlaying ? pulse : 1.0,
+            scale: isPlaying ? pulse : 1.0,
             child: Container(
               width: size,
               height: size,
@@ -239,10 +263,12 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> with TickerProvider
                   BoxShadow(
                     color: Colors.white.withOpacity(0.15),
                     blurRadius: 50,
-                    spreadRadius: widget.isPlaying ? 8 : 0,
+                    spreadRadius: isPlaying ? 8 : 0,
                   ),
                   BoxShadow(
-                    color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primary.withOpacity(0.3),
                     blurRadius: 40,
                     spreadRadius: 5,
                     offset: const Offset(0, 15),
@@ -261,7 +287,8 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> with TickerProvider
                         imageUrl: thumbUrl,
                         fit: BoxFit.cover,
                         placeholder: (_, __) => _placeholder(Icons.music_note),
-                        errorWidget: (_, __, ___) => _placeholder(Icons.broken_image),
+                        errorWidget: (_, __, ___) =>
+                            _placeholder(Icons.broken_image),
                       )
                     : _placeholder(Icons.music_note),
               ),
@@ -276,7 +303,10 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> with TickerProvider
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Theme.of(context).colorScheme.primaryContainer, Theme.of(context).colorScheme.secondaryContainer],
+          colors: [
+            Theme.of(context).colorScheme.primaryContainer,
+            Theme.of(context).colorScheme.secondaryContainer,
+          ],
         ),
       ),
       child: Icon(icon, size: 100, color: Colors.white.withOpacity(0.5)),
@@ -291,7 +321,12 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> with TickerProvider
           textAlign: TextAlign.center,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white, height: 1.2),
+          style: const TextStyle(
+            fontSize: 26,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            height: 1.2,
+          ),
         ),
         const SizedBox(height: 10),
         Container(
@@ -303,24 +338,36 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> with TickerProvider
           ),
           child: Text(
             artist,
-            style: TextStyle(fontSize: 15, color: Colors.white.withOpacity(0.85)),
+            style: TextStyle(
+              fontSize: 15,
+              color: Colors.white.withOpacity(0.85),
+            ),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildProgressBar() {
+  Widget _buildProgressBar(MusicPlayerProvider provider) {
     return StreamBuilder<Duration?>(
-      stream: widget.audioPlayer.durationStream,
-      initialData: widget.duration,
+      stream: provider.durationStream,
       builder: (_, dSnap) {
-        final d = dSnap.data ?? Duration.zero;
+        final duration = dSnap.data ?? Duration.zero;
+        final maxSeconds = duration.inSeconds.toDouble();
+
         return StreamBuilder<Duration>(
-          stream: widget.audioPlayer.positionStream,
-          initialData: widget.position,
+          stream: provider.positionStream,
           builder: (_, pSnap) {
-            final p = pSnap.data ?? Duration.zero;
+            final position = pSnap.data ?? Duration.zero;
+
+            final displayValue = _isDraggingSlider
+                ? _draggedSliderValue
+                : position.inSeconds.toDouble();
+
+            final displayPosition = _isDraggingSlider
+                ? Duration(seconds: _draggedSliderValue.round())
+                : position;
+
             return Column(
               children: [
                 SliderTheme(
@@ -330,15 +377,39 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> with TickerProvider
                     inactiveTrackColor: Colors.white.withOpacity(0.2),
                     thumbColor: Colors.white,
                     overlayColor: Colors.white.withOpacity(0.2),
-                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
-                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+                    thumbShape: const RoundSliderThumbShape(
+                      enabledThumbRadius: 8,
+                    ),
+                    overlayShape: const RoundSliderOverlayShape(
+                      overlayRadius: 16,
+                    ),
                   ),
                   child: Slider(
-                    value: p.inSeconds.clamp(0, d.inSeconds).toDouble(),
-                    max: d.inSeconds > 0 ? d.inSeconds.toDouble() : 1,
-                    onChanged: (v) {
+                    value: displayValue.clamp(
+                      0.0,
+                      maxSeconds > 0 ? maxSeconds : 1.0,
+                    ),
+                    max: maxSeconds > 0 ? maxSeconds : 1.0,
+                    onChangeStart: (value) {
+                      setState(() {
+                        _isDraggingSlider = true;
+                        _draggedSliderValue = value;
+                      });
+                    },
+                    onChanged: (value) {
+                      setState(() {
+                        _draggedSliderValue = value;
+                      });
                       HapticFeedback.selectionClick();
-                      widget.audioPlayer.seek(Duration(seconds: v.toInt()));
+                    },
+                    onChangeEnd: (value) {
+                      final clampedSeconds = value
+                          .clamp(0.0, maxSeconds - 0.5)
+                          .round();
+                      provider.seek(Duration(seconds: clampedSeconds));
+                      setState(() {
+                        _isDraggingSlider = false;
+                      });
                     },
                   ),
                 ),
@@ -347,8 +418,20 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> with TickerProvider
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(_formatDuration(p), style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.7))),
-                      Text(_formatDuration(d), style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.7))),
+                      Text(
+                        _formatDuration(displayPosition),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.white.withOpacity(0.7),
+                        ),
+                      ),
+                      Text(
+                        _formatDuration(duration),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.white.withOpacity(0.7),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -360,45 +443,63 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> with TickerProvider
     );
   }
 
-  Widget _buildControls() {
+  Widget _buildControls(MusicPlayerProvider provider) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        if (widget.onPrevious != null) _controlButton(Icons.skip_previous, widget.onPrevious!, 34),
+        _controlButton(Icons.skip_previous, provider.playPrevious, 34),
         const SizedBox(width: 24),
         StreamBuilder<bool>(
-          stream: widget.audioPlayer.playingStream,
-          initialData: widget.isPlaying,
+          stream: provider.playingStream,
+          initialData: provider.isPlaying,
           builder: (_, snap) {
-            final isPlaying = snap.data ?? widget.isPlaying;
-            return Container(
-              width: 76,
-              height: 76,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: const LinearGradient(colors: [Colors.white, Color(0xFFF0F0F0)]),
-                boxShadow: [
-                  BoxShadow(color: Colors.white.withOpacity(0.5), blurRadius: 25, spreadRadius: 5),
-                  BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 10)),
-                ],
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () {
-                    HapticFeedback.mediumImpact();
-                    widget.onPlayPause();
-                  },
-                  borderRadius: BorderRadius.circular(38),
-                  child: Icon(isPlaying ? Icons.pause : Icons.play_arrow, size: 42, color: const Color(0xFF0a0e27)),
-                ),
-              ),
-            );
+            final isPlaying = snap.data ?? provider.isPlaying;
+            return _buildPlayPauseButton(isPlaying, provider.playPause);
           },
         ),
         const SizedBox(width: 24),
-        if (widget.onNext != null) _controlButton(Icons.skip_next, widget.onNext!, 34),
+        _controlButton(Icons.skip_next, provider.playNext, 34),
       ],
+    );
+  }
+
+  Widget _buildPlayPauseButton(bool isPlaying, VoidCallback onPlayPause) {
+    return Container(
+      width: 76,
+      height: 76,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const LinearGradient(
+          colors: [Colors.white, Color(0xFFF0F0F0)],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.white.withOpacity(0.5),
+            blurRadius: 25,
+            spreadRadius: 5,
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.mediumImpact();
+            onPlayPause();
+          },
+          borderRadius: BorderRadius.circular(38),
+          child: Icon(
+            isPlaying ? Icons.pause : Icons.play_arrow,
+            size: 42,
+            color: const Color(0xFF0a0e27),
+          ),
+        ),
+      ),
     );
   }
 
@@ -425,7 +526,12 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> with TickerProvider
     );
   }
 
-  Widget _iconButton(IconData icon, VoidCallback onTap, {bool isActive = false, double size = 28}) {
+  Widget _iconButton(
+    IconData icon,
+    VoidCallback onTap, {
+    bool isActive = false,
+    double size = 28,
+  }) {
     return Material(
       color: Colors.transparent,
       child: InkWell(

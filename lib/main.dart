@@ -12,7 +12,8 @@ import 'providers/search_provider.dart';
 import 'services/download_service.dart';
 import 'screens/home_screen.dart';
 
-final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
+final RouteObserver<ModalRoute<void>> routeObserver =
+    RouteObserver<ModalRoute<void>>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,23 +46,8 @@ Future<void> main() async {
   );
 }
 
-
-
-
-
-
-
 class MusicSearchApp extends StatelessWidget {
-
-
-
   const MusicSearchApp({super.key});
-
-
-
-
-
-
 
   @override
   Widget build(BuildContext context) {

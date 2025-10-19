@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
@@ -28,7 +27,9 @@ class _MusicCardState extends State<MusicCard> {
   Widget build(BuildContext context) {
     final downloadService = context.watch<DownloadService>();
     final progress = downloadService.downloadProgress[widget.video.videoId];
-    final isQueued = downloadService.downloadQueue.any((v) => v.videoId == widget.video.videoId);
+    final isQueued = downloadService.downloadQueue.any(
+      (v) => v.videoId == widget.video.videoId,
+    );
     final isDownloading = progress != null;
 
     return ListTile(
@@ -82,10 +83,14 @@ class _MusicCardState extends State<MusicCard> {
         ],
       ),
       trailing: isDownloading
-          ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+          ? const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
           : isQueued
-              ? const Chip(label: Text('Queued'))
-              : const Icon(Icons.download),
+          ? const Chip(label: Text('Queued'))
+          : const Icon(Icons.download),
       enabled: !isDownloading,
       onTap: () => _showDownloadSheet(context),
       onLongPress: () {

@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../providers/playlist_provider.dart';
 import '../providers/library_provider.dart';
 import '../models/playlist.dart';
-import '../services/playlist_service.dart';
 import 'playlist_detail_screen.dart';
 
 /// Utility class for playlist-related dialogs
@@ -104,9 +103,9 @@ class PlaylistsScreen extends StatelessWidget {
     final data = await _PlaylistDialogs.showCreateDialog(context);
     if (data != null && context.mounted) {
       await context.read<PlaylistProvider>().createPlaylist(
-            data['name']!,
-            description: data['description']!.isEmpty ? null : data['description'],
-          );
+        data['name']!,
+        description: data['description']!.isEmpty ? null : data['description'],
+      );
     }
   }
 
@@ -118,8 +117,8 @@ class PlaylistsScreen extends StatelessWidget {
       body: playlistProvider.isLoading
           ? const Center(child: CircularProgressIndicator())
           : playlistProvider.playlists.isEmpty
-              ? _buildEmptyState(context)
-              : _buildPlaylistGrid(context, playlistProvider),
+          ? _buildEmptyState(context)
+          : _buildPlaylistGrid(context, playlistProvider),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showCreatePlaylistDialog(context),
         icon: const Icon(Icons.add),
@@ -147,8 +146,8 @@ class PlaylistsScreen extends StatelessWidget {
           Text(
             'Make a playlist!',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),
@@ -170,15 +169,10 @@ class PlaylistsScreen extends StatelessWidget {
             key: Key('playlist_${playlist.id}'),
             direction: DismissDirection.endToStart,
             background: _buildDismissBackground(context),
-            confirmDismiss: (_) => _PlaylistDialogs.showDeleteConfirmation(
-              context,
-              playlist.name,
-            ),
-            onDismissed: (_) => _handlePlaylistDismissed(
-              context,
-              playlistProvider,
-              playlist,
-            ),
+            confirmDismiss: (_) =>
+                _PlaylistDialogs.showDeleteConfirmation(context, playlist.name),
+            onDismissed: (_) =>
+                _handlePlaylistDismissed(context, playlistProvider, playlist),
             child: _PlaylistCard(
               playlist: playlist,
               onTap: () => _navigateToPlaylistDetail(context, playlist.id),
@@ -209,9 +203,9 @@ class PlaylistsScreen extends StatelessWidget {
   ) async {
     await playlistProvider.deletePlaylist(playlist.id);
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('"${playlist.name}" deleted')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('"${playlist.name}" deleted')));
     }
   }
 
@@ -233,10 +227,7 @@ class _PlaylistCard extends StatelessWidget {
   final Playlist playlist;
   final VoidCallback onTap;
 
-  const _PlaylistCard({
-    required this.playlist,
-    required this.onTap,
-  });
+  const _PlaylistCard({required this.playlist, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -259,9 +250,7 @@ class _PlaylistCard extends StatelessWidget {
                 child: _PlaylistArtwork(playlist: playlist),
               ),
               const SizedBox(width: 16),
-              Expanded(
-                child: _PlaylistInfo(playlist: playlist),
-              ),
+              Expanded(child: _PlaylistInfo(playlist: playlist)),
               _PlaylistOptionsButton(playlist: playlist),
             ],
           ),
@@ -440,9 +429,9 @@ class _PlaylistInfo extends StatelessWidget {
       children: [
         Text(
           playlist.name,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
@@ -451,8 +440,8 @@ class _PlaylistInfo extends StatelessWidget {
           Text(
             playlist.description!,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
@@ -469,9 +458,9 @@ class _PlaylistInfo extends StatelessWidget {
             Text(
               '${playlist.songCount} songs',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
-                    fontWeight: FontWeight.w500,
-                  ),
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ],
         ),
@@ -522,8 +511,9 @@ class _PlaylistOptionsButton extends StatelessWidget {
                           TextButton(
                             onPressed: () => Navigator.pop(context, true),
                             style: TextButton.styleFrom(
-                              foregroundColor:
-                                  Theme.of(context).colorScheme.error,
+                              foregroundColor: Theme.of(
+                                context,
+                              ).colorScheme.error,
                             ),
                             child: const Text('Delete'),
                           ),
@@ -532,14 +522,12 @@ class _PlaylistOptionsButton extends StatelessWidget {
                     );
 
                     if (context.mounted && confirmed == true) {
-                      await context
-                          .read<PlaylistProvider>()
-                          .deletePlaylist(playlist.id);
+                      await context.read<PlaylistProvider>().deletePlaylist(
+                        playlist.id,
+                      );
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('"${playlist.name}" deleted'),
-                          ),
+                          SnackBar(content: Text('"${playlist.name}" deleted')),
                         );
                       }
                     }

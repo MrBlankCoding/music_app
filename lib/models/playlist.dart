@@ -3,7 +3,8 @@ class Playlist {
   final String name;
   final String? description;
   final DateTime createdAt;
-  final List<Map<String, dynamic>> songs; // Store complete song objects with metadata
+  final List<Map<String, dynamic>>
+  songs; // Store complete song objects with metadata
 
   Playlist({
     required this.id,
@@ -16,7 +17,7 @@ class Playlist {
   factory Playlist.fromJson(Map<String, dynamic> json) {
     // Handle both old format (songPaths) and new format (songs)
     List<Map<String, dynamic>> songsList;
-    
+
     if (json.containsKey('songs')) {
       songsList = (json['songs'] as List)
           .map((s) => Map<String, dynamic>.from(s as Map))
@@ -26,7 +27,7 @@ class Playlist {
       songsList = (json['songPaths'] as List).map((path) {
         return <String, dynamic>{
           'path': path as String,
-          'name': (path as String).split('/').last.replaceAll('.mp3', ''),
+          'name': (path).split('/').last.replaceAll('.mp3', ''),
           'artist': 'Unknown Artist',
           'size': 0,
           'modified': DateTime.now().toIso8601String(),
@@ -55,7 +56,8 @@ class Playlist {
         // Ensure DateTime objects are serialized as strings
         final serialized = Map<String, dynamic>.from(song);
         if (serialized['modified'] is DateTime) {
-          serialized['modified'] = (serialized['modified'] as DateTime).toIso8601String();
+          serialized['modified'] = (serialized['modified'] as DateTime)
+              .toIso8601String();
         }
         return serialized;
       }).toList(),
