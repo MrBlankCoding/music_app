@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/playlist_provider.dart';
 import '../providers/library_provider.dart';
 import '../models/playlist.dart';
+import '../utils/playlist_artwork_helper.dart';
 import '../widgets/playlist_dialogs.dart';
 import 'playlist_detail_screen.dart';
 
@@ -172,7 +173,12 @@ class _PlaylistArtwork extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final thumbnails = _getThumbnails(context);
+    final thumbnails = context.select<LibraryProvider, List<String>>(
+      (libraryProvider) => PlaylistArtworkHelper.getThumbnails(
+        playlist,
+        libraryProvider.songs,
+      ),
+    );
     final boxDecoration = BoxDecoration(
       borderRadius: BorderRadius.circular(12),
       boxShadow: [
@@ -195,31 +201,6 @@ class _PlaylistArtwork extends StatelessWidget {
     return _buildGridArtwork(context, thumbnails, boxDecoration);
   }
 
-  List<String> _getThumbnails(BuildContext context) {
-    final libraryProvider = context.watch<LibraryProvider>();
-    final thumbnails = <String>[];
-
-    for (var song in playlist.songs.take(4)) {
-      final storedPath = song['path'] as String?;
-      if (storedPath == null) continue;
-
-      final filename = storedPath.split('/').last;
-      final librarySong = libraryProvider.songs.firstWhere(
-        (s) => (s['path'] as String).split('/').last == filename,
-        orElse: () => <String, dynamic>{},
-      );
-
-      final thumbnailUrl = librarySong.isNotEmpty
-          ? librarySong['thumbnail_url']
-          : song['thumbnail_url'];
-
-      if (thumbnailUrl != null) {
-        thumbnails.add(thumbnailUrl as String);
-      }
-    }
-
-    return thumbnails;
-  }
 
   Widget _buildEmptyArtwork(BuildContext context, BoxDecoration decoration) {
     return Container(

@@ -9,7 +9,7 @@ import '../widgets/playback_bar.dart';
 import '../widgets/playlist_dialogs.dart';
 import '../services/song_management_service.dart';
 import 'home_screen.dart';
-import '../utils/song_data_helper.dart';
+import '../utils/playlist_artwork_helper.dart';
 
 class PlaylistDetailScreen extends StatelessWidget {
   final String playlistId;
@@ -49,13 +49,10 @@ class PlaylistDetailScreen extends StatelessWidget {
     Playlist playlist,
     LibraryProvider libraryProvider,
   ) {
-    final thumbnails = <String>[];
-    for (var song in playlist.songs.take(4)) {
-      final songData = SongData(song);
-      if (songData.thumbnailUrl != null) {
-        thumbnails.add(songData.thumbnailUrl!);
-      }
-    }
+    final thumbnails = PlaylistArtworkHelper.getThumbnails(
+      playlist,
+      libraryProvider.songs,
+    );
 
     final double size = 200;
 
