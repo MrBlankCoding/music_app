@@ -11,10 +11,50 @@ import '../services/song_management_service.dart';
 import 'home_screen.dart';
 import '../utils/playlist_artwork_helper.dart';
 
-class PlaylistDetailScreen extends StatelessWidget {
+class PlaylistDetailScreen extends StatefulWidget {
   final String playlistId;
 
   const PlaylistDetailScreen({super.key, required this.playlistId});
+
+  @override
+  State<PlaylistDetailScreen> createState() => _PlaylistDetailScreenState();
+}
+
+class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
+
+  // Cache for reconciled songs to avoid recomputation on every build
+  List<Map<String, dynamic>>? _cachedSongs;
+  String? _cachedPlaylistId;
+  int? _cachedPlaylistSongsHash;
+  int? _cachedLibrarySongsHash;
+
+  List<Map<String, dynamic>> _getReconciledSongs(
+    Playlist playlist,
+    List<Map<String, dynamic>> librarySongs,
+  ) {
+    // Compute hash codes for change detection
+    final playlistHash = Object.hashAll(playlist.songs.map((s) => s['path']));
+    final libraryHash = Object.hashAll(librarySongs.map((s) => s['path']));
+
+    // Return cached result if nothing changed
+    if (_cachedSongs != null &&
+        _cachedPlaylistId == playlist.id &&
+        _cachedPlaylistSongsHash == playlistHash &&
+        _cachedLibrarySongsHash == libraryHash) {
+      return _cachedSongs!;
+    }
+
+    // Recompute and cache
+    final songManagementService = SongManagementService(context);
+    final reconciled = songManagementService.getReconciledPlaylistSongs(playlist);
+    
+    _cachedSongs = reconciled;
+    _cachedPlaylistId = playlist.id;
+    _cachedPlaylistSongsHash = playlistHash;
+    _cachedLibrarySongsHash = libraryHash;
+
+    return reconciled;
+  }
 
   Future<void> _removeSongFromPlaylist(
     BuildContext context,
@@ -28,7 +68,16 @@ class PlaylistDetailScreen extends StatelessWidget {
     if (musicPlayerProvider.currentSong?['path'] == songPath) {
       await musicPlayerProvider.stop();
     }
-    await playlistProvider.removeSongFromPlaylist(playlistId, songPath);
+    await playlistProvider.removeSongFromPlaylist(widget.playlistId, songPath);
+    
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Song removed from playlist'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   Future<void> _handleSongTap(
@@ -181,8 +230,7 @@ class PlaylistDetailScreen extends StatelessWidget {
     final playlistProvider = context.watch<PlaylistProvider>();
     final musicPlayerProvider = context.watch<MusicPlayerProvider>();
     final libraryProvider = context.watch<LibraryProvider>();
-    final songManagementService = SongManagementService(context);
-    final playlist = playlistProvider.getPlaylistById(playlistId);
+    final playlist = playlistProvider.getPlaylistById(widget.playlistId);
 
     if (playlist == null) {
       return Scaffold(
@@ -191,7 +239,8 @@ class PlaylistDetailScreen extends StatelessWidget {
       );
     }
 
-    final songs = songManagementService.getReconciledPlaylistSongs(playlist);
+    // Use cached reconciled songs to avoid recomputation on every build
+    final songs = _getReconciledSongs(playlist, libraryProvider.songs);
 
     return Scaffold(
       appBar: AppBar(
@@ -289,9 +338,16 @@ class PlaylistDetailScreen extends StatelessWidget {
                         newIndex -= 1;
                       }
                       playlistProvider.reorderPlaylist(
-                        playlistId,
+                        widget.playlistId,
                         oldIndex,
                         newIndex,
+                      );
+                      
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Playlist reordered'),
+                          duration: Duration(seconds: 1),
+                        ),
                       );
                     },
                   ),

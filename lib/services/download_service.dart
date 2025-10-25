@@ -67,15 +67,17 @@ class DownloadService with ChangeNotifier {
       _downloadProgress.remove(video.videoId);
       _downloadDetails.remove(video.videoId);
 
-      // Always show success toast
-      showToast(
-        "✓ Downloaded: ${video.title}",
-        position: const ToastPosition(
-          align: Alignment.bottomCenter,
-          offset: -72.0,
-        ),
-        duration: const Duration(seconds: 3),
-      );
+      // Show success toast only when queue screen is not visible
+      if (!isQueueScreenVisible) {
+        showToast(
+          "✓ Downloaded: ${video.title}",
+          position: const ToastPosition(
+            align: Alignment.bottomCenter,
+            offset: -72.0,
+          ),
+          duration: const Duration(seconds: 3),
+        );
+      }
 
       _libraryProvider?.loadSongs();
     } catch (e, s) {
@@ -89,15 +91,17 @@ class DownloadService with ChangeNotifier {
       _downloadProgress.remove(video.videoId);
       _downloadDetails.remove(video.videoId);
 
-      // Always show failure toast
-      showToast(
-        "✗ Download failed: ${video.title}",
-        position: const ToastPosition(
-          align: Alignment.bottomCenter,
-          offset: -72.0,
-        ),
-        duration: const Duration(seconds: 3),
-      );
+      // Show failure toast only when queue screen is not visible
+      if (!isQueueScreenVisible) {
+        showToast(
+          "✗ Download failed: ${video.title}",
+          position: const ToastPosition(
+            align: Alignment.bottomCenter,
+            offset: -72.0,
+          ),
+          duration: const Duration(seconds: 3),
+        );
+      }
     } finally {
       _isDownloading = false;
       notifyListeners();
@@ -115,8 +119,10 @@ class DownloadService with ChangeNotifier {
     final sanitizedTitle = video.title
         .replaceAll(RegExp(r'[^\w\s-]'), '')
         .replaceAll(RegExp(r'\s+'), '_');
-    final outputPath = '$_downloadDirectory/$sanitizedTitle.mp3';
-    final metadataPath = '$_downloadDirectory/$sanitizedTitle.json';
+    // Append video ID to prevent filename collisions
+    final uniqueFilename = '${sanitizedTitle}_${video.videoId}';
+    final outputPath = '$_downloadDirectory/$uniqueFilename.mp3';
+    final metadataPath = '$_downloadDirectory/$uniqueFilename.json';
     final file = File(outputPath);
 
     // Fetch video metadata from server
@@ -264,7 +270,9 @@ class DownloadService with ChangeNotifier {
     final sanitizedTitle = video.title
         .replaceAll(RegExp(r'[^\w\s-]'), '')
         .replaceAll(RegExp(r'\s+'), '_');
-    final outputPath = '$_downloadDirectory/$sanitizedTitle.mp3';
+    // Append video ID to prevent filename collisions
+    final uniqueFilename = '${sanitizedTitle}_${video.videoId}';
+    final outputPath = '$_downloadDirectory/$uniqueFilename.mp3';
     final file = File(outputPath);
 
     try {

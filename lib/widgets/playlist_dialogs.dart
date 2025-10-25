@@ -226,6 +226,15 @@ class PlaylistDialogs {
             : descriptionController.text,
       );
       await context.read<PlaylistProvider>().updatePlaylist(updatedPlaylist);
+      
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Updated "${updatedPlaylist.name}"'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
     }
 
     nameController.dispose();

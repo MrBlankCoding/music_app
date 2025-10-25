@@ -48,11 +48,12 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           // Show sort menu when on Library tab
           if (_selectedIndex == 1)
-            Consumer<LibraryProvider>(
-              builder: (context, libraryProvider, child) {
+            Selector<LibraryProvider, SortOrder>(
+              selector: (_, provider) => provider.sortOrder,
+              builder: (context, sortOrder, child) {
                 return PopupMenuButton<SortOrder>(
                   onSelected: (sortOrder) =>
-                      libraryProvider.setSortOrder(sortOrder),
+                      context.read<LibraryProvider>().setSortOrder(sortOrder),
 
                   itemBuilder: (context) => const [
                     PopupMenuItem(
@@ -91,19 +92,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
           // Show refresh button when on Playlists tab
           if (_selectedIndex == 2)
-            Consumer<PlaylistProvider>(
-              builder: (context, playlistProvider, child) {
-                return IconButton(
-                  icon: const Icon(Icons.refresh),
-
-                  onPressed: () => playlistProvider.loadPlaylists(),
-                );
-              },
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: () => context.read<PlaylistProvider>().loadPlaylists(),
             ),
 
-          Consumer<DownloadService>(
-            builder: (context, downloadService, child) {
-              if (downloadService.downloadQueue.isEmpty) {
+          Selector<DownloadService, int>(
+            selector: (_, service) => service.downloadQueue.length,
+            builder: (context, queueLength, child) {
+              if (queueLength == 0) {
                 return const SizedBox.shrink();
               }
 
@@ -111,16 +108,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 onPressed: () {
                   Navigator.push(
                     context,
-
                     MaterialPageRoute(
                       builder: (context) => const DownloadQueueScreen(),
                     ),
                   );
                 },
-
                 icon: Badge(
-                  label: Text(downloadService.downloadQueue.length.toString()),
-
+                  label: Text(queueLength.toString()),
                   child: const Icon(Icons.download),
                 ),
               );

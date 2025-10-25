@@ -36,7 +36,9 @@ class PlaylistProvider with ChangeNotifier {
         name,
         description: description,
       );
-      await loadPlaylists();
+      // Mutate local state instead of reloading from disk
+      _playlists.add(playlist);
+      notifyListeners();
       return playlist;
     } catch (e) {
       // Handle error
@@ -47,7 +49,9 @@ class PlaylistProvider with ChangeNotifier {
   Future<void> deletePlaylist(String playlistId) async {
     try {
       await _playlistService.deletePlaylist(playlistId);
-      await loadPlaylists();
+      // Mutate local state instead of reloading from disk
+      _playlists.removeWhere((p) => p.id == playlistId);
+      notifyListeners();
     } catch (e) {
       // Handle error
     }
@@ -56,7 +60,12 @@ class PlaylistProvider with ChangeNotifier {
   Future<void> updatePlaylist(Playlist playlist) async {
     try {
       await _playlistService.updatePlaylist(playlist);
-      await loadPlaylists();
+      // Mutate local state instead of reloading from disk
+      final index = _playlists.indexWhere((p) => p.id == playlist.id);
+      if (index != -1) {
+        _playlists[index] = playlist;
+        notifyListeners();
+      }
     } catch (e) {
       // Handle error
     }
@@ -68,7 +77,14 @@ class PlaylistProvider with ChangeNotifier {
   ) async {
     try {
       await _playlistService.addSongToPlaylist(playlistId, song);
-      await loadPlaylists();
+      // Mutate local state instead of reloading from disk
+      final index = _playlists.indexWhere((p) => p.id == playlistId);
+      if (index != -1) {
+        final playlist = _playlists[index];
+        final updatedSongs = List<Map<String, dynamic>>.from(playlist.songs)..add(song);
+        _playlists[index] = playlist.copyWith(songs: updatedSongs);
+        notifyListeners();
+      }
     } catch (e) {
       // Handle error
     }
@@ -80,7 +96,14 @@ class PlaylistProvider with ChangeNotifier {
   ) async {
     try {
       await _playlistService.removeSongFromPlaylist(playlistId, songPath);
-      await loadPlaylists();
+      // Mutate local state instead of reloading from disk
+      final index = _playlists.indexWhere((p) => p.id == playlistId);
+      if (index != -1) {
+        final playlist = _playlists[index];
+        final updatedSongs = playlist.songs.where((s) => s['path'] != songPath).toList();
+        _playlists[index] = playlist.copyWith(songs: updatedSongs);
+        notifyListeners();
+      }
     } catch (e) {
       // Handle error
     }
@@ -106,10 +129,12 @@ class PlaylistProvider with ChangeNotifier {
         final updatedSongs = List<Map<String, dynamic>>.from(playlist.songs);
         final item = updatedSongs.removeAt(oldIndex);
         updatedSongs.insert(newIndex, item);
-        await _playlistService.updatePlaylist(
-          playlist.copyWith(songs: updatedSongs),
-        );
-        await loadPlaylists();
+        final updatedPlaylist = playlist.copyWith(songs: updatedSongs);
+        // Mutate local state immediately for responsive UI
+        _playlists[index] = updatedPlaylist;
+        notifyListeners();
+        // Persist to disk in background
+        await _playlistService.updatePlaylist(updatedPlaylist);
       }
     } catch (e) {
       // Handle error
@@ -119,7 +144,15 @@ class PlaylistProvider with ChangeNotifier {
   Future<void> removeSongFromAllPlaylists(String songPath) async {
     try {
       await _playlistService.removeSongFromAllPlaylists(songPath);
-      await loadPlaylists();
+      // Mutate local state instead of reloading from disk
+      for (int i = 0; i < _playlists.length; i++) {
+        final playlist = _playlists[i];
+        final updatedSongs = playlist.songs.where((s) => s['path'] != songPath).toList();
+        if (updatedSongs.length != playlist.songs.length) {
+          _playlists[i] = playlist.copyWith(songs: updatedSongs);
+        }
+      }
+      notifyListeners();
     } catch (e) {
       // Handle error
     }

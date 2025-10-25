@@ -20,7 +20,8 @@ class LibraryProvider with ChangeNotifier {
 
   // Getters
   List<Map<String, dynamic>> get songs {
-    List<Map<String, dynamic>> filteredSongs = _songs;
+    // Create defensive copy to prevent mutation of stored list
+    List<Map<String, dynamic>> filteredSongs = List.of(_songs);
 
     if (_filterQuery.isNotEmpty) {
       filteredSongs = filteredSongs

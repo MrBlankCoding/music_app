@@ -23,6 +23,15 @@ class SongManagementService {
     await _libraryProvider.deleteSong(songPath);
     await _playlistProvider.removeSongFromAllPlaylists(songPath);
     await _libraryProvider.loadSongs();
+    
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Song deleted from library'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   List<Map<String, dynamic>> getReconciledPlaylistSongs(Playlist playlist) {
