@@ -11,7 +11,7 @@ enum SortOrder {
 }
 
 class LibraryProvider with ChangeNotifier {
-  final DownloadService _downloadService = DownloadService();
+  final DownloadService _downloadService;
 
   List<Map<String, dynamic>> _songs = [];
   bool _isLoading = true;
@@ -69,9 +69,8 @@ class LibraryProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   SortOrder get sortOrder => _sortOrder;
 
-  LibraryProvider() {
-    loadSongs();
-  }
+  LibraryProvider({DownloadService? downloadService})
+      : _downloadService = downloadService ?? DownloadService();
 
   void setSortOrder(SortOrder sortOrder) {
     _sortOrder = sortOrder;

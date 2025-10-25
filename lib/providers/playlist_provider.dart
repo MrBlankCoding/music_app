@@ -3,7 +3,7 @@ import '../models/playlist.dart';
 import '../services/playlist_service.dart';
 
 class PlaylistProvider with ChangeNotifier {
-  final PlaylistService _playlistService = PlaylistService();
+  final PlaylistService _playlistService;
 
   List<Playlist> _playlists = [];
   bool _isLoading = true;
@@ -12,9 +12,7 @@ class PlaylistProvider with ChangeNotifier {
   List<Playlist> get playlists => _playlists;
   bool get isLoading => _isLoading;
 
-  PlaylistProvider() {
-    loadPlaylists();
-  }
+  PlaylistProvider({PlaylistService? playlistService}) : _playlistService = playlistService ?? PlaylistService();
 
   Future<void> loadPlaylists() async {
     _isLoading = true;

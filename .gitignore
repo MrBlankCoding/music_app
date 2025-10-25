@@ -22,10 +22,6 @@ android/app/debug
 android/app/profile
 android/app/release
 ios/Flutter/.last_build_id
-
-# Created by https://www.toptal.com/developers/gitignore/api/flutter
-# Edit at https://www.toptal.com/developers/gitignore?templates=flutter
-
 ### Flutter ###
 # Flutter/Dart/Pub related
 **/doc/api/

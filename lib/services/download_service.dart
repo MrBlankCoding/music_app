@@ -24,9 +24,10 @@ class DownloadService with ChangeNotifier {
 
   String? _downloadDirectory;
   final String _serverUrl =
-      'https://downloadapi-production-6d65.up.railway.app';
+      'http://127.0.0.1:8000';
   // http://127.0.0.1:8000
   // https://hurt-denni-mrblankcoding-605d0a56.koyeb.app
+  // https://downloadapi-production-6d65.up.railway.app
   final Queue<YouTubeVideo> _downloadQueue = Queue<YouTubeVideo>();
   final Map<String, double> _downloadProgress = {};
   final Map<String, Map<String, dynamic>> _downloadDetails = {};

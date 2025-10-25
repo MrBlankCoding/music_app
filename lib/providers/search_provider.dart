@@ -4,9 +4,7 @@ import '../models/youtube_video.dart';
 import '../services/youtube_service.dart';
 
 class SearchProvider with ChangeNotifier {
-  final YouTubeService _youtubeService = YouTubeService(
-    apiKey: dotenv.env['YOUTUBE_API_KEY'] ?? '',
-  );
+  final YouTubeService _youtubeService;
 
   List<YouTubeVideo> _videos = [];
   bool _isLoading = false;
@@ -18,6 +16,10 @@ class SearchProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String get query => _query;
   List<String> get recentSearches => List.unmodifiable(_recentSearches);
+
+  SearchProvider({YouTubeService? youtubeService})
+      : _youtubeService = youtubeService ??
+            YouTubeService(apiKey: dotenv.env['YOUTUBE_API_KEY'] ?? '');
 
   Future<void> search(String query) async {
     if (query.trim().isEmpty) return;

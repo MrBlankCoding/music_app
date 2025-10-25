@@ -14,29 +14,20 @@ class VideoDetailsSheet extends StatefulWidget {
 
 class _VideoDetailsSheetState extends State<VideoDetailsSheet> {
   bool _isDownloading = false;
-  double _downloadProgress = 0.0;
 
   Future<void> _downloadSong() async {
     setState(() {
       _isDownloading = true;
-      _downloadProgress = 0.0;
     });
 
     try {
       final downloadService = DownloadService();
-      await downloadService.initialize();
-
-      await downloadService.downloadAudio(
-        widget.video,
-        onProgress: (progress) {
-          setState(() => _downloadProgress = progress);
-        },
-      );
+      downloadService.addToQueue(widget.video);
 
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('Downloaded')));
+        ).showSnackBar(const SnackBar(content: Text('Added to download queue')));
         Navigator.pop(context);
       }
     } catch (e) {
@@ -91,11 +82,7 @@ class _VideoDetailsSheetState extends State<VideoDetailsSheet> {
           ),
           const SizedBox(height: 16),
           if (_isDownloading) ...[
-            LinearProgressIndicator(
-              value: _downloadProgress > 0 ? _downloadProgress : null,
-            ),
-            const SizedBox(height: 8),
-            Text('${(_downloadProgress * 100).toInt()}%'),
+            const LinearProgressIndicator(),
             const SizedBox(height: 16),
           ],
           SizedBox(

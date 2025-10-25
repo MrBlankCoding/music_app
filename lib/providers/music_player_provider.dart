@@ -4,14 +4,15 @@ import 'package:just_audio/just_audio.dart';
 import '../services/audio_player_service.dart';
 
 class MusicPlayerProvider with ChangeNotifier {
-  final AudioPlayerService _audioPlayerService = AudioPlayerService();
+  final AudioPlayerService _audioPlayerService;
   late StreamSubscription<Map<String, dynamic>?> _currentSongSubscription;
   late StreamSubscription<bool> _playingStateSubscription;
 
   Map<String, dynamic>? _currentSong;
   bool _isPlaying = false;
 
-  MusicPlayerProvider() {
+  MusicPlayerProvider({AudioPlayerService? audioPlayerService})
+      : _audioPlayerService = audioPlayerService ?? AudioPlayerService() {
     _currentSongSubscription = _audioPlayerService.currentSongStream.listen((
       song,
     ) {

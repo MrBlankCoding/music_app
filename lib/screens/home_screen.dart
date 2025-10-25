@@ -27,6 +27,13 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
 
     _selectedIndex = widget.initialIndex;
+
+    // Kick off initial data loads after first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<LibraryProvider>().loadSongs();
+      context.read<PlaylistProvider>().loadPlaylists();
+    });
   }
 
   final List<Widget> _screens = [
