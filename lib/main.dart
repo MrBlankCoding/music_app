@@ -9,9 +9,9 @@ import 'providers/library_provider.dart';
 import 'providers/playlist_provider.dart';
 import 'providers/search_provider.dart';
 import 'services/download_service.dart';
-import 'screens/home_screen.dart';
 import 'theme.dart';
 
+import 'screens/home_screen.dart';
 import 'services/youtube_service.dart';
 
 final RouteObserver<ModalRoute<void>> routeObserver =

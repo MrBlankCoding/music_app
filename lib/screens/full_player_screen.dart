@@ -7,6 +7,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:ui';
 import '../providers/music_player_provider.dart';
 import '../utils/song_data_helper.dart';
+import 'queue_screen.dart';
 
 class FullPlayerScreen extends StatefulWidget {
   const FullPlayerScreen({super.key});
@@ -231,11 +232,28 @@ class _FullPlayerScreenState extends State<FullPlayerScreen>
                 () => Navigator.pop(context),
                 size: 32,
               ),
-              _iconButton(
-                Icons.shuffle,
-                provider.toggleShuffle,
-                isActive: provider.isShuffleEnabled,
-                size: 26,
+              Row(
+                children: [
+                  _iconButton(
+                    Icons.queue_music,
+                    () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const QueueScreen(),
+                        ),
+                      );
+                    },
+                    size: 26,
+                  ),
+                  const SizedBox(width: 16),
+                  _iconButton(
+                    Icons.shuffle,
+                    provider.toggleShuffle,
+                    isActive: provider.isShuffleEnabled,
+                    size: 26,
+                  ),
+                ],
               ),
             ],
           ),

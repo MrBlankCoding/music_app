@@ -1,15 +1,36 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/playlist_provider.dart';
 import '../providers/library_provider.dart';
 import '../models/playlist.dart';
 import '../utils/playlist_artwork_helper.dart';
 import '../widgets/playlist_dialogs.dart';
+import '../widgets/search_bar_widget.dart';
 import 'playlist_detail_screen.dart';
 
-class PlaylistsScreen extends StatelessWidget {
+class PlaylistsScreen extends StatefulWidget {
   const PlaylistsScreen({super.key});
+
+  @override
+  State<PlaylistsScreen> createState() => _PlaylistsScreenState();
+}
+
+class _PlaylistsScreenState extends State<PlaylistsScreen> {
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(() {
+      setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   Future<void> _showCreatePlaylistDialog(BuildContext context) async {
     await PlaylistDialogs.showCreatePlaylistDialog(context);
@@ -18,13 +39,28 @@ class PlaylistsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final playlistProvider = context.watch<PlaylistProvider>();
+    final query = _searchController.text.toLowerCase();
+    final playlists = playlistProvider.playlists
+        .where((p) => p.name.toLowerCase().contains(query))
+        .toList();
 
     return Scaffold(
-      body: playlistProvider.isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : playlistProvider.playlists.isEmpty
-              ? _buildEmptyState(context)
-              : _buildPlaylistGrid(context, playlistProvider),
+      body: Column(
+        children: [
+          SearchBarWidget(
+            controller: _searchController,
+            hintText: 'Search playlists...',
+            onChanged: (value) => setState(() {}),
+          ),
+          Expanded(
+            child: playlistProvider.isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : playlists.isEmpty
+                    ? _buildEmptyState(context)
+                    : _buildPlaylistGrid(context, playlists),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showCreatePlaylistDialog(context),
         icon: const Icon(Icons.add),
@@ -62,57 +98,29 @@ class PlaylistsScreen extends StatelessWidget {
 
   Widget _buildPlaylistGrid(
     BuildContext context,
-    PlaylistProvider playlistProvider,
+    List<Playlist> playlists,
   ) {
+    final playlistProvider = context.read<PlaylistProvider>();
     return RefreshIndicator(
       onRefresh: playlistProvider.loadPlaylists,
-      child: ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        itemCount: playlistProvider.playlists.length,
+      child: GridView.builder(
+        padding: const EdgeInsets.all(16),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
+          childAspectRatio: 0.75,
+        ),
+        itemCount: playlists.length,
         itemBuilder: (context, index) {
-          final playlist = playlistProvider.playlists[index];
-          return Dismissible(
-            key: Key('playlist_${playlist.id}'),
-            direction: DismissDirection.endToStart,
-            background: _buildDismissBackground(context),
-            confirmDismiss: (_) =>
-                PlaylistDialogs.showDeletePlaylistConfirmationDialog(context, playlist.name),
-            onDismissed: (_) =>
-                _handlePlaylistDismissed(context, playlistProvider, playlist),
-            child: _PlaylistCard(
-              playlist: playlist,
-              onTap: () => _navigateToPlaylistDetail(context, playlist.id),
-            ),
+          final playlist = playlists[index];
+          return _PlaylistGridItem(
+            playlist: playlist,
+            onTap: () => _navigateToPlaylistDetail(context, playlist.id),
           );
         },
       ),
     );
-  }
-
-  Widget _buildDismissBackground(BuildContext context) {
-    return Container(
-      alignment: Alignment.centerRight,
-      padding: const EdgeInsets.only(right: 20),
-      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.error,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: const Icon(Icons.delete, color: Colors.white, size: 32),
-    );
-  }
-
-  Future<void> _handlePlaylistDismissed(
-    BuildContext context,
-    PlaylistProvider playlistProvider,
-    Playlist playlist,
-  ) async {
-    await playlistProvider.deletePlaylist(playlist.id);
-    if (context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('"${playlist.name}" deleted')));
-    }
   }
 
   void _navigateToPlaylistDetail(BuildContext context, String playlistId) {
@@ -129,41 +137,62 @@ class PlaylistsScreen extends StatelessWidget {
   }
 }
 
-class _PlaylistCard extends StatelessWidget {
+class _PlaylistGridItem extends StatelessWidget {
   final Playlist playlist;
   final VoidCallback onTap;
 
-  const _PlaylistCard({required this.playlist, required this.onTap});
+  const _PlaylistGridItem({required this.playlist, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () {
-          HapticFeedback.lightImpact();
-          onTap();
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            children: [
-              Hero(
-                tag: 'playlist_${playlist.id}',
-                child: _PlaylistArtwork(playlist: playlist),
-              ),
-              const SizedBox(width: 16),
-              Expanded(child: _PlaylistInfo(playlist: playlist)),
-              _PlaylistOptionsButton(playlist: playlist),
-            ],
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Hero(
+              tag: 'playlist_${playlist.id}',
+              child: _PlaylistArtwork(playlist: playlist),
+            ),
           ),
-        ),
+          const SizedBox(height: 8),
+          Text(
+            playlist.name,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${playlist.songCount} songs, ${_formatDuration(playlist.songs)} total',
+            style: Theme.of(context).textTheme.bodySmall,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ),
     );
   }
+}
+
+String _formatDuration(List<Map<String, dynamic>> songs) {
+  final totalSeconds = songs.fold<int>(
+    0,
+    (prev, song) => prev + (song['duration'] as int? ?? 0),
+  );
+
+  final duration = Duration(seconds: totalSeconds);
+  final hours = duration.inHours;
+  final minutes = duration.inMinutes.remainder(60);
+  final seconds = duration.inSeconds.remainder(60);
+
+  if (hours > 0) {
+    return '$hours:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+  return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
 }
 
 class _PlaylistArtwork extends StatelessWidget {
@@ -179,34 +208,22 @@ class _PlaylistArtwork extends StatelessWidget {
         libraryProvider.songs,
       ),
     );
-    final boxDecoration = BoxDecoration(
-      borderRadius: BorderRadius.circular(12),
-      boxShadow: [
-        BoxShadow(
-          color: Theme.of(context).shadowColor.withAlpha(25),
-          blurRadius: 8,
-          offset: const Offset(0, 2),
-        ),
-      ],
-    );
 
     if (thumbnails.isEmpty) {
-      return _buildEmptyArtwork(context, boxDecoration);
+      return _buildEmptyArtwork(context);
     }
 
     if (thumbnails.length == 1) {
-      return _buildSingleArtwork(context, thumbnails[0], boxDecoration);
+      return _buildSingleArtwork(context, thumbnails[0]);
     }
 
-    return _buildGridArtwork(context, thumbnails, boxDecoration);
+    return _buildGridArtwork(context, thumbnails);
   }
 
-
-  Widget _buildEmptyArtwork(BuildContext context, BoxDecoration decoration) {
+  Widget _buildEmptyArtwork(BuildContext context) {
     return Container(
-      width: 80,
-      height: 80,
-      decoration: decoration.copyWith(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -224,58 +241,38 @@ class _PlaylistArtwork extends StatelessWidget {
     );
   }
 
-  Widget _buildSingleArtwork(
-    BuildContext context,
-    String url,
-    BoxDecoration decoration,
-  ) {
-    return Container(
-      width: 80,
-      height: 80,
-      decoration: decoration,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Image.network(
-          url,
-          width: 80,
-          height: 80,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _buildFallbackIcon(context),
-        ),
+  Widget _buildSingleArtwork(BuildContext context, String url) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Image.network(
+        url,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _buildFallbackIcon(context),
       ),
     );
   }
 
-  Widget _buildGridArtwork(
-    BuildContext context,
-    List<String> thumbnails,
-    BoxDecoration decoration,
-  ) {
-    return Container(
-      width: 80,
-      height: 80,
-      decoration: decoration,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: GridView.builder(
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            mainAxisSpacing: 2,
-            crossAxisSpacing: 2,
-          ),
-          itemCount: 4,
-          itemBuilder: (context, i) {
-            if (i < thumbnails.length) {
-              return Image.network(
-                thumbnails[i],
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => _buildGridPlaceholder(context),
-              );
-            }
-            return _buildGridPlaceholder(context);
-          },
+  Widget _buildGridArtwork(BuildContext context, List<String> thumbnails) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: GridView.builder(
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          mainAxisSpacing: 2,
+          crossAxisSpacing: 2,
         ),
+        itemCount: 4,
+        itemBuilder: (context, i) {
+          if (i < thumbnails.length) {
+            return Image.network(
+              thumbnails[i],
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => _buildGridPlaceholder(context),
+            );
+          }
+          return _buildGridPlaceholder(context);
+        },
       ),
     );
   }
@@ -300,132 +297,5 @@ class _PlaylistArtwork extends StatelessWidget {
         color: Theme.of(context).colorScheme.onSurfaceVariant,
       ),
     );
-  }
-}
-
-class _PlaylistInfo extends StatelessWidget {
-  final Playlist playlist;
-
-  const _PlaylistInfo({required this.playlist});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          playlist.name,
-          style: Theme.of(
-            context,
-          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Icon(
-              Icons.music_note,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              '${playlist.songCount} songs',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.primary,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _PlaylistOptionsButton extends StatefulWidget {
-  final Playlist playlist;
-
-  const _PlaylistOptionsButton({required this.playlist});
-
-  @override
-  State<_PlaylistOptionsButton> createState() => _PlaylistOptionsButtonState();
-}
-
-class _PlaylistOptionsButtonState extends State<_PlaylistOptionsButton> {
-  bool _isMenuOpen = false;
-
-  @override
-  void dispose() {
-    _isMenuOpen = false;
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      icon: const Icon(Icons.more_vert),
-      onPressed: _isMenuOpen ? null : () => _showOptions(context),
-    );
-  }
-
-  Future<void> _showOptions(BuildContext parentContext) async {
-    if (_isMenuOpen) return;
-
-    setState(() {
-      _isMenuOpen = true;
-    });
-
-    try {
-      await showModalBottomSheet(
-        context: parentContext,
-        isScrollControlled: true,
-        builder: (sheetContext) => SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: Icon(
-                  Icons.delete,
-                  color: Theme.of(sheetContext).colorScheme.error,
-                ),
-                title: Text(
-                  'Delete Playlist',
-                  style: TextStyle(
-                    color: Theme.of(sheetContext).colorScheme.error,
-                  ),
-                ),
-                onTap: () async {
-                  Navigator.pop(sheetContext);
-                  final confirmed = await PlaylistDialogs.showDeletePlaylistConfirmationDialog(
-                    parentContext,
-                    widget.playlist.name,
-                  );
-
-                  if (!parentContext.mounted || !confirmed) {
-                    return;
-                  }
-
-                  await parentContext.read<PlaylistProvider>().deletePlaylist(
-                    widget.playlist.id,
-                  );
-
-                  if (parentContext.mounted) {
-                    ScaffoldMessenger.of(parentContext).showSnackBar(
-                      SnackBar(content: Text('"${widget.playlist.name}" deleted')),
-                    );
-                  }
-                },
-              ),
-            ],
-          ),
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isMenuOpen = false;
-        });
-      }
-    }
   }
 }

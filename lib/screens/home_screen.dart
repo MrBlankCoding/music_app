@@ -6,9 +6,10 @@ import '../services/download_service.dart';
 import '../widgets/playback_bar.dart';
 
 import 'music_search_screen.dart';
-import 'library_screen.dart';
 import 'playlists_screen.dart';
+import 'library_screen.dart';
 import 'download_queue_screen.dart';
+import 'queue_screen.dart';
 
 import '../services/youtube_service.dart';
 
@@ -139,49 +140,25 @@ class _HomeScreenState extends State<HomeScreen> {
         title: Text(_titles[_selectedIndex]),
 
         actions: [
-          // Show sort menu when on Library tab
-          if (_selectedIndex == 1)
-            Selector<LibraryProvider, SortOrder>(
-              selector: (_, provider) => provider.sortOrder,
-              builder: (context, sortOrder, child) {
-                return PopupMenuButton<SortOrder>(
-                  onSelected: (sortOrder) =>
-                      context.read<LibraryProvider>().setSortOrder(sortOrder),
-
-                  itemBuilder: (context) => const [
-                    PopupMenuItem(
-                      value: SortOrder.dateNewest,
-                      child: Text('Date Added (Newest)'),
-                    ),
-
-                    PopupMenuItem(
-                      value: SortOrder.dateOldest,
-                      child: Text('Date Added (Oldest)'),
-                    ),
-
-                    PopupMenuItem(
-                      value: SortOrder.nameAz,
-                      child: Text('Name (A-Z)'),
-                    ),
-
-                    PopupMenuItem(
-                      value: SortOrder.nameZa,
-                      child: Text('Name (Z-A)'),
-                    ),
-
-                    PopupMenuItem(
-                      value: SortOrder.sizeLargest,
-                      child: Text('Size (Largest)'),
-                    ),
-
-                    PopupMenuItem(
-                      value: SortOrder.sizeSmallest,
-                      child: Text('Size (Smallest)'),
-                    ),
-                  ],
+          if (_selectedIndex == 1) ...[
+            IconButton(
+              icon: const Icon(Icons.queue_music),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const QueueScreen()),
                 );
               },
+              tooltip: 'Queue',
             ),
+            Consumer<LibraryProvider>(
+              builder: (context, libraryProvider, child) => IconButton(
+                icon: Icon(libraryProvider.isGridView ? Icons.list : Icons.grid_view),
+                onPressed: () => libraryProvider.toggleView(),
+                tooltip: libraryProvider.isGridView ? 'List View' : 'Grid View',
+              ),
+            ),
+          ],
 
           // Show refresh button when on Playlists tab
           if (_selectedIndex == 2)

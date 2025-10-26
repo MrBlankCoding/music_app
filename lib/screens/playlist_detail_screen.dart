@@ -7,7 +7,9 @@ import '../models/playlist.dart';
 import '../widgets/song_card.dart';
 import '../widgets/playback_bar.dart';
 import '../widgets/playlist_dialogs.dart';
+import '../widgets/song_grid_item.dart';
 import '../services/song_management_service.dart';
+
 import 'home_screen.dart';
 import '../utils/playlist_artwork_helper.dart';
 
@@ -21,6 +23,7 @@ class PlaylistDetailScreen extends StatefulWidget {
 }
 
 class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
+  bool _isGridView = false;
 
   // Cache for reconciled songs to avoid recomputation on every build
   List<Map<String, dynamic>>? _cachedSongs;
@@ -56,6 +59,23 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
     return reconciled;
   }
 
+  String _formatDuration(List<Map<String, dynamic>> songs) {
+    final totalSeconds = songs.fold<int>(
+      0,
+      (prev, song) => prev + (song['duration'] as int? ?? 0),
+    );
+
+    final duration = Duration(seconds: totalSeconds);
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+    final seconds = duration.inSeconds.remainder(60);
+
+    if (hours > 0) {
+      return '$hours:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    }
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
   Future<void> _removeSongFromPlaylist(
     BuildContext context,
     String songPath,
@@ -87,7 +107,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
     int index,
   ) async {
     if (musicPlayerProvider.currentSong?['path'] != song['path']) {
-      await musicPlayerProvider.setQueue(songs, initialIndex: index);
+      await musicPlayerProvider.setQueue(songs, index);
     } else {
       musicPlayerProvider.playPause();
     }
@@ -247,100 +267,173 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
         title: Text(playlist.name),
         actions: [
           IconButton(
+            icon: Icon(_isGridView ? Icons.list : Icons.grid_view),
+            onPressed: () {
+              setState(() {
+                _isGridView = !_isGridView;
+              });
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.edit),
             onPressed: () => PlaylistDialogs.showEditPlaylistDialog(context, playlist),
           ),
         ],
       ),
-      body: Column(
-        children: [
-          const SizedBox(height: 16),
-          Center(
-            child: Hero(
-              tag: 'playlist_${playlist.id}',
-              child: _buildPlaylistArtwork(context, playlist, libraryProvider),
+      body: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Column(
+              children: [
+                const SizedBox(height: 16),
+                Center(
+                  child: Hero(
+                    tag: 'playlist_${playlist.id}',
+                    child: _buildPlaylistArtwork(context, playlist, libraryProvider),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Playlist metadata
+                Text(
+                  playlist.name,
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${songs.length} songs, ${_formatDuration(songs)} total',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 16),
+                // Action buttons
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      Expanded(
+                        child: StreamBuilder<bool>(
+                          stream: musicPlayerProvider.isShuffleEnabledStream,
+                          builder: (context, snapshot) {
+                            final isShuffleEnabled = snapshot.data ?? false;
+                            return ElevatedButton.icon(
+                              icon: const Icon(Icons.shuffle),
+                              label: const Text('Shuffle'),
+                              style: ElevatedButton.styleFrom(
+                                foregroundColor: isShuffleEnabled
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Theme.of(context).colorScheme.onSurface,
+                              ),
+                              onPressed: songs.isEmpty
+                                  ? null
+                                  : () {
+                                      musicPlayerProvider.toggleShuffle();
+                                    },
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          icon: const Icon(Icons.play_arrow),
+                          label: const Text('Play'),
+                          onPressed: songs.isEmpty
+                              ? null
+                              : () {
+                                  musicPlayerProvider.setQueue(songs);
+                                },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: songs.isEmpty
-                ? const Center(child: Text('No songs in this playlist'))
-                : ReorderableListView.builder(
-                    padding: const EdgeInsets.only(bottom: 0),
-                    itemCount: songs.length,
-                    itemBuilder: (context, index) {
-                      final song = songs[index];
-                      final songPath = song['path'] as String;
-                      final isPlaying =
-                          musicPlayerProvider.currentSong?['path'] == songPath;
+          if (songs.isEmpty)
+            const SliverFillRemaining(
+              child: Center(child: Text('No songs in this playlist')),
+            )
+          else if (_isGridView)
+            _buildSliverGrid(songs, musicPlayerProvider)
+          else
+            SliverReorderableList(
+              itemCount: songs.length,
+              itemBuilder: (context, index) {
+                final song = songs[index];
+                final songPath = song['path'] as String;
+                final isPlaying =
+                    musicPlayerProvider.currentSong?['path'] == songPath;
 
-                      return SongCard(
-                        key: ValueKey(songPath),
-                        cardKey: ValueKey(songPath),
-                        song: song,
-                        isPlaying: isPlaying && musicPlayerProvider.isPlaying,
-                        showDragHandle: true,
-                        reorderIndex: index,
-                        enableSwipeToDelete: true,
-                        deleteConfirmMessage:
-                            'Remove this song from the playlist?',
-                        onDelete: () async {
-                          await _removeSongFromPlaylist(context, songPath);
-                        },
-                        onTap: () => _handleSongTap(
-                          musicPlayerProvider,
-                          song,
-                          songs,
-                          index,
-                        ),
-                        onPlay: () => _handleSongTap(
-                          musicPlayerProvider,
-                          song,
-                          songs,
-                          index,
-                        ),
-                        menuItems: [
-                          PopupMenuItem<String>(
-                            value: 'remove',
-                            child: ListTile(
-                              leading: Icon(
-                                Icons.remove_circle_outline,
-                                color: Theme.of(context).colorScheme.error,
-                              ),
-                              title: Text(
-                                'Remove from Playlist',
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.error,
-                                ),
-                              ),
-                              contentPadding: EdgeInsets.zero,
-                            ),
-                            onTap: () {
-                              _removeSongFromPlaylist(context, songPath);
-                            },
-                          ),
-                        ],
-                      );
-                    },
-                    onReorder: (oldIndex, newIndex) {
-                      if (newIndex > oldIndex) {
-                        newIndex -= 1;
-                      }
-                      playlistProvider.reorderPlaylist(
-                        widget.playlistId,
-                        oldIndex,
-                        newIndex,
-                      );
-                      
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Playlist reordered'),
-                          duration: Duration(seconds: 1),
-                        ),
-                      );
-                    },
+                return SongCard(
+                  key: ValueKey(songPath),
+                  cardKey: ValueKey(songPath),
+                  song: song,
+                  isPlaying: isPlaying && musicPlayerProvider.isPlaying,
+                  showDragHandle: true,
+                  reorderIndex: index,
+                  enableSwipeToDelete: true,
+                  deleteConfirmMessage:
+                      'Remove this song from the playlist?',
+                  onDelete: () async {
+                    await _removeSongFromPlaylist(context, songPath);
+                  },
+                  onTap: () => _handleSongTap(
+                    musicPlayerProvider,
+                    song,
+                    songs,
+                    index,
                   ),
-          ),
+                  onPlay: () => _handleSongTap(
+                    musicPlayerProvider,
+                    song,
+                    songs,
+                    index,
+                  ),
+                  menuItems: [
+                    PopupMenuItem<String>(
+                      value: 'remove',
+                      child: ListTile(
+                        leading: Icon(
+                          Icons.remove_circle_outline,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                        title: Text(
+                          'Remove from Playlist',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                        ),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      onTap: () {
+                        _removeSongFromPlaylist(context, songPath);
+                      },
+                    ),
+                  ],
+                );
+              },
+              onReorder: (oldIndex, newIndex) {
+                if (newIndex > oldIndex) {
+                  newIndex -= 1;
+                }
+                playlistProvider.reorderPlaylist(
+                  widget.playlistId,
+                  oldIndex,
+                  newIndex,
+                );
+                
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Playlist reordered'),
+                    duration: Duration(seconds: 1),
+                  ),
+                );
+              },
+            ),
         ],
       ),
       bottomNavigationBar: Column(
@@ -378,6 +471,37 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSliverGrid(List<Map<String, dynamic>> songs, 
+                     MusicPlayerProvider musicPlayerProvider) {
+    return SliverPadding(
+      padding: const EdgeInsets.all(12),
+      sliver: SliverGrid(
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          childAspectRatio: 0.8,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+        ),
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            final song = songs[index];
+            
+            return SongGridItem(
+              song: song,
+              onTap: () => _handleSongTap(
+                musicPlayerProvider,
+                song,
+                songs,
+                index,
+              ),
+            );
+          },
+          childCount: songs.length,
+        ),
       ),
     );
   }

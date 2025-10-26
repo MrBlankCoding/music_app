@@ -16,6 +16,7 @@ class LibraryProvider with ChangeNotifier {
   List<Map<String, dynamic>> _songs = [];
   bool _isLoading = true;
   SortOrder _sortOrder = SortOrder.dateNewest;
+  bool _isGridView = false;
   String _filterQuery = '';
 
   // Getters
@@ -68,12 +69,18 @@ class LibraryProvider with ChangeNotifier {
 
   bool get isLoading => _isLoading;
   SortOrder get sortOrder => _sortOrder;
+  bool get isGridView => _isGridView;
 
   LibraryProvider({DownloadService? downloadService})
       : _downloadService = downloadService ?? DownloadService();
 
   void setSortOrder(SortOrder sortOrder) {
     _sortOrder = sortOrder;
+    notifyListeners();
+  }
+
+  void toggleView() {
+    _isGridView = !_isGridView;
     notifyListeners();
   }
 

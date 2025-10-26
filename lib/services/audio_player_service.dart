@@ -76,8 +76,9 @@ class AudioPlayerService {
   /// Plays a list of songs.
   Future<void> playPlaylist(
     List<Map<String, dynamic>> songs,
-    int initialIndex,
-  ) async {
+    int initialIndex, {
+    bool shuffle = false,
+  }) async {
     if (songs.isEmpty) return;
 
     _playlistSubject.add(songs);
@@ -101,9 +102,34 @@ class AudioPlayerService {
       }).toList(),
     );
 
+    await _audioPlayer.setShuffleModeEnabled(shuffle);
     await _audioPlayer.setAudioSource(playlist, initialIndex: initialIndex);
     _currentSongSubject.add(songs[initialIndex]);
     await _audioPlayer.play();
+  }
+
+  Future<void> addToQueue(Map<String, dynamic> song) async {
+    final songData = SongData(song);
+    final mediaItem = MediaItem(
+      id: songData.id,
+      title: songData.title,
+      artist: songData.artist,
+      artUri: songData.thumbnailUrl != null
+          ? Uri.parse(songData.thumbnailUrl!)
+          : null,
+      extras: song,
+    );
+    final uri = songData.path.startsWith('http')
+        ? Uri.parse(songData.path)
+        : Uri.file(songData.path);
+    final audioSource = AudioSource.uri(uri, tag: mediaItem);
+
+    final playlist = _audioPlayer.audioSource as ConcatenatingAudioSource;
+    await playlist.add(audioSource);
+
+    final currentPlaylist = _playlistSubject.value;
+    currentPlaylist.add(song);
+    _playlistSubject.add(currentPlaylist);
   }
 
   /// Toggles between play and pause.

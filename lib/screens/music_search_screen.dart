@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/search_provider.dart';
+import '../widgets/search_bar_widget.dart';
 import '../widgets/music_card.dart';
 
 class MusicSearchScreen extends StatefulWidget {
@@ -38,36 +39,28 @@ class _MusicSearchScreenState extends State<MusicSearchScreen> {
 
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: TextField(
-            controller: _searchController,
-            decoration: InputDecoration(
-              hintText: 'Search music...',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: _searchController.text.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        _searchController.clear();
-                        searchProvider.clearSearch();
-                      },
-                    )
-                  : null,
-              border: const OutlineInputBorder(),
-            ),
-            onSubmitted: (query) => searchProvider.search(query),
-            onChanged: (query) {
-              _debounce?.cancel();
-              if (query.trim().isEmpty) {
-                searchProvider.clearSearch();
-                return;
-              }
-              _debounce = Timer(const Duration(milliseconds: 450), () {
-                searchProvider.search(query);
-              });
-            },
-          ),
+        SearchBarWidget(
+          controller: _searchController,
+          hintText: 'Search music...',
+          onChanged: (query) {
+            _debounce?.cancel();
+            if (query.trim().isEmpty) {
+              searchProvider.clearSearch();
+              return;
+            }
+            _debounce = Timer(const Duration(milliseconds: 450), () {
+              searchProvider.search(query);
+            });
+          },
+          suffixIcon: _searchController.text.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: () {
+                    _searchController.clear();
+                    searchProvider.clearSearch();
+                  },
+                )
+              : null,
         ),
         Expanded(
           child: searchProvider.isLoading

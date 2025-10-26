@@ -38,7 +38,6 @@ class PlaylistArtworkHelper {
           librarySongData?.thumbnailUrl ?? playlistSongData.thumbnailUrl;
 
       if (thumbnailUrl != null && thumbnailUrl.isNotEmpty) {
-        print('Found thumbnail: $thumbnailUrl');
         thumbnails.add(thumbnailUrl);
       }
     }

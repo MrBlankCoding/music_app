@@ -43,10 +43,14 @@ class MusicPlayerProvider with ChangeNotifier {
 
   // Methods
   Future<void> setQueue(
-    List<Map<String, dynamic>> songs, {
-    int initialIndex = 0,
-  }) async {
+    List<Map<String, dynamic>> songs,
+    [int initialIndex = 0,]
+  ) async {
     await _audioPlayerService.playPlaylist(songs, initialIndex);
+  }
+
+  Future<void> addToQueue(Map<String, dynamic> song) async {
+    await _audioPlayerService.addToQueue(song);
   }
 
   void playPause() {

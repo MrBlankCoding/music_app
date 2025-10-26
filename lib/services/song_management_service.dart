@@ -62,6 +62,7 @@ class SongManagementService {
           'thumbnailUrl': songData.thumbnailUrl,
           'title': songData.title,
           'video_id': song['video_id'],
+          'duration': song['duration'] ?? 0,
         };
 
         if (song['modified'] is String) {
