@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import '../providers/music_player_provider.dart';
 import '../utils/song_data_helper.dart';
@@ -39,7 +38,7 @@ class SongCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final songData = SongData(song);
     final songPath = songData.path;
-    final thumbnailUrl = songData.thumbnailUrl;
+    final albumArtBytes = songData.albumArt;
     final artist = songData.artist;
     final title = songData.title;
 
@@ -114,7 +113,7 @@ class SongCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                     child: _buildAlbumArtImage(
                       context,
-                      thumbnailUrl,
+                      albumArtBytes,
                       showDragHandle,
                     ),
                   ),
@@ -248,7 +247,7 @@ class SongCard extends StatelessWidget {
 
   Widget _buildAlbumArtImage(
     BuildContext context,
-    String? thumbnailUrl,
+    Uint8List? albumArtBytes,
     bool compact,
   ) {
     final musicPlayerProvider = context.watch<MusicPlayerProvider>();
@@ -257,39 +256,37 @@ class SongCard extends StatelessWidget {
         stream: musicPlayerProvider.sequenceStateStream,
         builder: (context, snapshot) {
           final mediaItem = snapshot.data?.currentSource?.tag as MediaItem?;
-          final effectiveUrl = mediaItem?.artUri?.toString() ?? thumbnailUrl;
-          return _buildAlbumArtFromUrl(context, effectiveUrl, compact);
+          final effectiveBytes =
+              mediaItem?.extras?['albumArt'] as Uint8List? ?? albumArtBytes;
+          return _buildAlbumArt(effectiveBytes, compact);
         },
       );
     }
 
-    return _buildAlbumArtFromUrl(context, thumbnailUrl, compact);
+    return _buildAlbumArt(albumArtBytes, compact);
   }
 
-  Widget _buildAlbumArtFromUrl(
-    BuildContext context,
-    String? url,
-    bool compact,
-  ) {
-    if (url != null && url.isNotEmpty) {
-      return CachedNetworkImage(
-        imageUrl: url,
+  Widget _buildAlbumArt(Uint8List? albumArtBytes, bool compact) {
+    if (albumArtBytes != null) {
+      return Image.memory(
+        albumArtBytes,
         fit: BoxFit.cover,
-        placeholder: (context, _) => Container(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        ),
-        errorWidget: (context, __, ___) => Icon(
-          Icons.music_note,
-          size: compact ? 28 : 32,
-          color: Theme.of(context).colorScheme.onSurfaceVariant.withAlpha(153),
-        ),
+        errorBuilder: (_, __, ___) => _buildPlaceholder(Icons.broken_image),
       );
     }
+    return _buildPlaceholder(Icons.music_note);
+  }
 
-    return Icon(
-      Icons.music_note,
-      size: compact ? 28 : 32,
-      color: Theme.of(context).colorScheme.onSurfaceVariant.withAlpha(153),
+  Widget _buildPlaceholder(IconData icon) {
+    return Container(
+      color: Colors.grey.shade800,
+      child: Center(
+        child: Icon(
+          icon,
+          size: 32,
+          color: Colors.grey.shade600,
+        ),
+      ),
     );
   }
 }

@@ -1,9 +1,9 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:ui';
 import '../providers/music_player_provider.dart';
 import '../utils/song_data_helper.dart';
@@ -80,15 +80,14 @@ class _FullPlayerScreenState extends State<FullPlayerScreen>
         builder: (context, seqSnap) {
           final mediaItem = seqSnap.data?.currentSource?.tag as MediaItem?;
           final songData = SongData(currentSong);
-          final thumbUrl =
-              mediaItem?.artUri?.toString() ?? songData.thumbnailUrl;
+          final albumArt = songData.albumArt;
           final title = mediaItem?.title ?? songData.title;
           final artist = mediaItem?.artist ?? songData.artist;
           final heroId = mediaItem?.id ?? songData.id;
 
           return Stack(
             children: [
-              _buildBackground(thumbUrl),
+              _buildBackground(albumArt),
               GestureDetector(
                 onVerticalDragUpdate: (d) => setState(() {
                   _dragOffset = (_dragOffset + (d.primaryDelta ?? 0)).clamp(
@@ -127,7 +126,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen>
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       _buildAlbumArt(
-                                        thumbUrl,
+                                        albumArt,
                                         heroId,
                                         musicPlayerProvider.isPlaying,
                                       ),
@@ -156,7 +155,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen>
     );
   }
 
-  Widget _buildBackground(String? thumbUrl) {
+  Widget _buildBackground(Uint8List? albumArt) {
     return AnimatedBuilder(
       animation: _pulseController,
       builder: (context, _) {
@@ -176,12 +175,12 @@ class _FullPlayerScreenState extends State<FullPlayerScreen>
                 ),
               ),
             ),
-            if (thumbUrl != null) ...[
+            if (albumArt != null) ...[
               Positioned.fill(
-                child: CachedNetworkImage(
-                  imageUrl: thumbUrl,
+                child: Image.memory(
+                  albumArt,
                   fit: BoxFit.cover,
-                  errorWidget: (_, __, ___) => const SizedBox.shrink(),
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                 ),
               ),
               Positioned.fill(
@@ -262,7 +261,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen>
     );
   }
 
-  Widget _buildAlbumArt(String? thumbUrl, String heroId, bool isPlaying) {
+  Widget _buildAlbumArt(Uint8List? albumArt, String heroId, bool isPlaying) {
     final size = MediaQuery.of(context).size.width * 0.72;
     return Hero(
       tag: 'album_art_$heroId',
@@ -300,12 +299,11 @@ class _FullPlayerScreenState extends State<FullPlayerScreen>
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(20),
-                child: thumbUrl != null
-                    ? CachedNetworkImage(
-                        imageUrl: thumbUrl,
+                child: albumArt != null
+                    ? Image.memory(
+                        albumArt,
                         fit: BoxFit.cover,
-                        placeholder: (_, __) => _placeholder(Icons.music_note),
-                        errorWidget: (_, __, ___) =>
+                        errorBuilder: (_, __, ___) =>
                             _placeholder(Icons.broken_image),
                       )
                     : _placeholder(Icons.music_note),

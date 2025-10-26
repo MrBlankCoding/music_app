@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:rxdart/rxdart.dart';
@@ -68,6 +70,15 @@ class AudioPlayerService {
     });
   }
 
+  /// Converts album art bytes to a URI for MediaItem
+  Uri? _albumArtToUri(Uint8List? albumArt) {
+    if (albumArt == null) return null;
+    
+    // Convert bytes to base64 data URI
+    final base64String = base64Encode(albumArt);
+    return Uri.parse('data:image/jpeg;base64,$base64String');
+  }
+
   /// Plays a single song.
   Future<void> play(Map<String, dynamic> song) async {
     await playPlaylist([song], 0);
@@ -90,9 +101,7 @@ class AudioPlayerService {
           id: songData.id,
           title: songData.title,
           artist: songData.artist,
-          artUri: songData.thumbnailUrl != null
-              ? Uri.parse(songData.thumbnailUrl!)
-              : null,
+          artUri: _albumArtToUri(songData.albumArt),
           extras: song,
         );
         final uri = songData.path.startsWith('http')
@@ -114,9 +123,7 @@ class AudioPlayerService {
       id: songData.id,
       title: songData.title,
       artist: songData.artist,
-      artUri: songData.thumbnailUrl != null
-          ? Uri.parse(songData.thumbnailUrl!)
-          : null,
+      artUri: _albumArtToUri(songData.albumArt),
       extras: song,
     );
     final uri = songData.path.startsWith('http')

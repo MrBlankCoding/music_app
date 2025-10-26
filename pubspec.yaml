@@ -10,28 +10,19 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  cupertino_icons: ^1.0.8
   http: ^1.5.0
-  cached_network_image: ^3.3.0
   path_provider: ^2.1.1
   just_audio: ^0.9.36
   just_audio_background: ^0.0.1-beta.17
-  audio_session: ^0.1.18
-  permission_handler: ^12.0.1
   provider: ^6.1.5+1
   google_fonts: ^6.3.2
   oktoast: ^3.4.0
-  flutter_local_notifications: ^16.3.2
+  flutter_media_metadata: ^1.0.0
 
   rxdart: any
-  flutter_downloader: ^1.12.0
 dev_dependencies:
-  flutter_test:
-    sdk: flutter
   flutter_lints: ^6.0.0
   build_runner: ^2.10.1
 
 flutter:
   uses-material-design: true
-  assets:
-    - .env

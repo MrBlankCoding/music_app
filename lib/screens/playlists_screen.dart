@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/playlist_provider.dart';
@@ -202,22 +203,22 @@ class _PlaylistArtwork extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final thumbnails = context.select<LibraryProvider, List<String>>(
-      (libraryProvider) => PlaylistArtworkHelper.getThumbnails(
+    final albumArts = context.select<LibraryProvider, List<Uint8List>>(
+      (libraryProvider) => PlaylistArtworkHelper.getAlbumArts(
         playlist,
         libraryProvider.songs,
       ),
     );
 
-    if (thumbnails.isEmpty) {
+    if (albumArts.isEmpty) {
       return _buildEmptyArtwork(context);
     }
 
-    if (thumbnails.length == 1) {
-      return _buildSingleArtwork(context, thumbnails[0]);
+    if (albumArts.length == 1) {
+      return _buildSingleArtwork(context, albumArts[0]);
     }
 
-    return _buildGridArtwork(context, thumbnails);
+    return _buildGridArtwork(context, albumArts);
   }
 
   Widget _buildEmptyArtwork(BuildContext context) {
@@ -241,18 +242,18 @@ class _PlaylistArtwork extends StatelessWidget {
     );
   }
 
-  Widget _buildSingleArtwork(BuildContext context, String url) {
+  Widget _buildSingleArtwork(BuildContext context, Uint8List albumArt) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
-      child: Image.network(
-        url,
+      child: Image.memory(
+        albumArt,
         fit: BoxFit.cover,
         errorBuilder: (_, __, ___) => _buildFallbackIcon(context),
       ),
     );
   }
 
-  Widget _buildGridArtwork(BuildContext context, List<String> thumbnails) {
+  Widget _buildGridArtwork(BuildContext context, List<Uint8List> albumArts) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
       child: GridView.builder(
@@ -264,9 +265,9 @@ class _PlaylistArtwork extends StatelessWidget {
         ),
         itemCount: 4,
         itemBuilder: (context, i) {
-          if (i < thumbnails.length) {
-            return Image.network(
-              thumbnails[i],
+          if (i < albumArts.length) {
+            return Image.memory(
+              albumArts[i],
               fit: BoxFit.cover,
               errorBuilder: (_, __, ___) => _buildGridPlaceholder(context),
             );

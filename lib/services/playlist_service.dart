@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:path_provider/path_provider.dart';
 import '../models/playlist.dart';
 import '../utils/song_data_helper.dart';
@@ -154,13 +155,13 @@ class PlaylistService {
     }
   }
 
-  /// Resolves thumbnail URLs for a playlist by matching songs with library songs
-  /// Returns up to 4 thumbnail URLs for display in playlist artwork
-  List<String> getPlaylistThumbnails(
+  /// Resolves album art for a playlist by matching songs with library songs
+  /// Returns up to 4 album art byte arrays for display in playlist artwork
+  List<Uint8List> getPlaylistAlbumArts(
     Playlist playlist,
     List<Map<String, dynamic>> librarySongs,
   ) {
-    final thumbnails = <String>[];
+    final albumArts = <Uint8List>[];
 
     for (var song in playlist.songs.take(4)) {
       final songData = SongData(song);
@@ -172,15 +173,15 @@ class PlaylistService {
         orElse: () => <String, dynamic>{},
       );
 
-      final thumbnailUrl = librarySong.isNotEmpty
-          ? SongData(librarySong).thumbnailUrl
-          : songData.thumbnailUrl;
+      final albumArt = librarySong.isNotEmpty
+          ? SongData(librarySong).albumArt
+          : songData.albumArt;
 
-      if (thumbnailUrl != null) {
-        thumbnails.add(thumbnailUrl);
+      if (albumArt != null) {
+        albumArts.add(albumArt);
       }
     }
 
-    return thumbnails;
+    return albumArts;
   }
 }

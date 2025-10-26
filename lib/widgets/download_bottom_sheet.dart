@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/youtube_video.dart';
 import '../services/download_service.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
 class DownloadBottomSheet extends StatelessWidget {
   final YouTubeVideo video;
@@ -18,16 +17,6 @@ class DownloadBottomSheet extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: CachedNetworkImage(
-                imageUrl: video.thumbnailUrl,
-                width: 120,
-                height: 90,
-                fit: BoxFit.cover,
-              ),
-            ),
-            const SizedBox(height: 16),
             Text(
               video.title,
               textAlign: TextAlign.center,

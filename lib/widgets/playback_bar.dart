@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/music_player_provider.dart';
 import '../screens/full_player_screen.dart';
 import '../utils/song_data_helper.dart';
@@ -308,7 +307,7 @@ class _PlaybackBarState extends State<PlaybackBar>
     );
   }
 
-  Widget _buildAlbumArt(
+Widget _buildAlbumArt(
     ThemeData theme,
     SongData songData,
     MusicPlayerProvider provider,
@@ -317,19 +316,17 @@ class _PlaybackBarState extends State<PlaybackBar>
       stream: provider.sequenceStateStream,
       builder: (context, snapshot) {
         final mediaItem = snapshot.data?.currentSource?.tag as MediaItem?;
-        final thumbUrl = mediaItem?.artUri?.toString() ?? songData.thumbnailUrl;
+        final artBytes = mediaItem?.extras?['albumArt'] as Uint8List?;
 
         return ClipRRect(
           borderRadius: BorderRadius.circular(8),
-          child: thumbUrl != null
-              ? CachedNetworkImage(
-                  imageUrl: thumbUrl,
+          child: artBytes != null
+              ? Image.memory(
+                  artBytes,
                   width: 56,
                   height: 56,
                   fit: BoxFit.cover,
-                  placeholder: (_, __) =>
-                      _buildPlaceholder(theme, Icons.music_note),
-                  errorWidget: (_, __, ___) =>
+                  errorBuilder: (_, __, ___) =>
                       _buildPlaceholder(theme, Icons.broken_image),
                 )
               : _buildPlaceholder(theme, Icons.music_note),

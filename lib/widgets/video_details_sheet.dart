@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../models/youtube_video.dart';
 import '../services/download_service.dart';
 
@@ -41,24 +40,6 @@ class _VideoDetailsSheetState extends State<VideoDetailsSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: CachedNetworkImage(
-              imageUrl: widget.video.thumbnailUrl,
-              height: 180,
-              width: double.infinity,
-              fit: BoxFit.cover,
-              placeholder: (context, url) => Container(
-                height: 180,
-                color: Theme.of(context).colorScheme.surfaceContainerHigh,
-                child: Icon(
-                  Icons.music_note,
-                  size: 60,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-          ),
           const SizedBox(height: 16),
           Text(
             widget.video.title,

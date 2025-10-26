@@ -118,14 +118,14 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
     Playlist playlist,
     LibraryProvider libraryProvider,
   ) {
-    final thumbnails = PlaylistArtworkHelper.getThumbnails(
+    final albumArts = PlaylistArtworkHelper.getAlbumArts(
       playlist,
       libraryProvider.songs,
     );
 
-    final double size = 200;
+    const double size = 200;
 
-    if (thumbnails.isEmpty) {
+    if (albumArts.isEmpty) {
       return Container(
         width: size,
         height: size,
@@ -155,7 +155,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
       );
     }
 
-    if (thumbnails.length == 1) {
+    if (albumArts.length == 1) {
       return Container(
         width: size,
         height: size,
@@ -171,8 +171,8 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
-          child: Image.network(
-            thumbnails[0],
+          child: Image.memory(
+            albumArts[0],
             fit: BoxFit.cover,
             errorBuilder: (context, error, stackTrace) {
               return Container(
@@ -213,9 +213,9 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
           ),
           itemCount: 4,
           itemBuilder: (context, i) {
-            if (i < thumbnails.length) {
-              return Image.network(
-                thumbnails[i],
+            if (i < albumArts.length) {
+              return Image.memory(
+                albumArts[i],
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) {
                   return Container(

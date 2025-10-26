@@ -59,7 +59,7 @@ class SongManagementService {
           'name': songData.title,
           'artist': songData.artist,
           'size': song['size'] ?? 0,
-          'thumbnailUrl': songData.thumbnailUrl,
+          'albumArt': songData.albumArt,
           'title': songData.title,
           'video_id': song['video_id'],
           'duration': song['duration'] ?? 0,

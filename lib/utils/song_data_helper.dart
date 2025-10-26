@@ -1,11 +1,13 @@
+import 'dart:typed_data';
+
 class SongData {
   final Map<String, dynamic> _songData;
 
   SongData(this._songData);
 
-  String? get thumbnailUrl {
-    return _songData['thumbnailUrl'] as String? ??
-        _songData['thumbnail_url'] as String?;
+  Uint8List? get albumArt {
+    return _songData['albumArt'] as Uint8List? ??
+        _songData['album_art'] as Uint8List?;
   }
 
   String get title {

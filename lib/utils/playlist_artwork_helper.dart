@@ -1,47 +1,39 @@
+import 'dart:typed_data';
 import '../models/playlist.dart';
-import 'song_data_helper.dart';
 
 class PlaylistArtworkHelper {
-  const PlaylistArtworkHelper._();
-
-  static List<String> getThumbnails(
+  /// Get album arts from songs in the playlist
+  /// Returns up to 4 unique album arts for grid display
+  static List<Uint8List> getAlbumArts(
     Playlist playlist,
-    List<Map<String, dynamic>> librarySongs,
+    List<Map<String, dynamic>> allSongs,
   ) {
-    final thumbnails = <String>[];
+    final List<Uint8List> albumArts = [];
+    final Set<String> seenPaths = {};
 
-    for (final song in playlist.songs) {
-      if (thumbnails.length >= 4) break;
+    // Get songs in the playlist
+    for (final songData in playlist.songs) {
+      if (albumArts.length >= 4) break;
 
-      final storedPath = song['path'] as String?;
-      Map<String, dynamic>? librarySong;
+      final songPath = songData['path'] as String?;
+      if (songPath == null) continue;
 
-      if (storedPath != null) {
-        final filename = storedPath.split('/').last;
-        librarySong = librarySongs.firstWhere(
-          (s) {
-            final libraryPath = s['path'] as String?;
-            if (libraryPath == null) return false;
-            return libraryPath.split('/').last == filename;
-          },
-          orElse: () => <String, dynamic>{},
-        );
-        if (librarySong.isEmpty) {
-          librarySong = null;
-        }
-      }
+      // Find the matching song in allSongs
+      final matchingSong = allSongs.firstWhere(
+        (song) => song['path'] == songPath,
+        orElse: () => <String, dynamic>{},
+      );
 
-      final librarySongData = librarySong != null ? SongData(librarySong) : null;
-      final playlistSongData = SongData(song);
-
-      final thumbnailUrl =
-          librarySongData?.thumbnailUrl ?? playlistSongData.thumbnailUrl;
-
-      if (thumbnailUrl != null && thumbnailUrl.isNotEmpty) {
-        thumbnails.add(thumbnailUrl);
+      // Get album art from the song
+      final albumArt = matchingSong['albumArt'] as Uint8List?;
+      
+      // Only add if it exists and we haven't seen it before
+      if (albumArt != null && !seenPaths.contains(songPath)) {
+        albumArts.add(albumArt);
+        seenPaths.add(songPath);
       }
     }
 
-    return thumbnails;
+    return albumArts;
   }
 }

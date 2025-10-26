@@ -1,9 +1,11 @@
 import 'dart:collection';
 import 'dart:io';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
+import 'package:flutter_media_metadata/flutter_media_metadata.dart';
 import '../models/youtube_video.dart';
 import 'dart:developer' as developer;
 import 'package:oktoast/oktoast.dart';
@@ -69,12 +71,11 @@ class DownloadService with ChangeNotifier {
         await file.writeAsBytes(response.bodyBytes);
         print('Downloaded song path: $filePath');
 
-        // Save metadata as JSON
+        // Save metadata as JSON (simplified - no separate album art)
         final metadata = {
           'title': video.title,
           'channel': video.channelTitle,
           'artist': video.channelTitle,
-          'thumbnail_url': video.thumbnailUrl,
           'video_id': video.videoId,
         };
         final metadataPath = '$_downloadDirectory/$sanitizedTitle.json';
@@ -170,6 +171,18 @@ class DownloadService with ChangeNotifier {
           );
         }
 
+        // Extract album art from MP3 file
+        Uint8List? albumArtBytes;
+        try {
+          final mp3Metadata = await MetadataRetriever.fromFile(file);
+          albumArtBytes = mp3Metadata.albumArt;
+        } catch (e) {
+          developer.log(
+            'Error extracting album art from ${file.path}: $e',
+            name: 'DownloadService',
+          );
+        }
+
         // Derive display name from filename
         String fileDisplayName = file.path
             .split('/')
@@ -201,22 +214,21 @@ class DownloadService with ChangeNotifier {
           artist = parsed.artist;
         }
 
-        // Decide on title -> clean/
+        // Decide on title
         final baseTitle = (title != null && title.isNotEmpty)
             ? title
             : (parsed.title ?? fileDisplayName);
         final effectiveTitle = MetadataUtils.cleanTitle(
           MetadataUtils.normalizeWhitespace(baseTitle),
         );
-        final effectiveName =
-            effectiveTitle; // what Library UI uses for display/sort
+        final effectiveName = effectiveTitle;
 
         return {
           'path': file.path,
           'name': effectiveName,
           'size': stat.size,
           'modified': stat.modified,
-          'thumbnailUrl': metadata?['thumbnail_url'],
+          'albumArt': albumArtBytes,
           'artist': artist,
           'title': effectiveTitle,
           'video_id': metadata?['video_id'],
@@ -241,6 +253,12 @@ class DownloadService with ChangeNotifier {
   Future<void> deleteSong(String path) async {
     final file = File(path);
     if (await file.exists()) await file.delete();
+    
+    // Delete associated metadata file
+    final baseName = path.replaceAll('.mp3', '');
+    final metadataPath = '$baseName.json';
+    final metadataFile = File(metadataPath);
+    if (await metadataFile.exists()) await metadataFile.delete();
   }
 
   String get downloadDirectory => _downloadDirectory ?? '';
