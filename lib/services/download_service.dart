@@ -7,7 +7,6 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter_media_metadata/flutter_media_metadata.dart';
 import '../models/youtube_video.dart';
-import 'dart:developer' as developer;
 import 'package:oktoast/oktoast.dart';
 import '../providers/library_provider.dart';
 import '../utils/metadata_utils.dart';
@@ -33,8 +32,8 @@ class DownloadService with ChangeNotifier {
   bool get isDownloading => _isDownloading;
   String? get currentlyDownloadingVideoId =>
       _isDownloading && _downloadQueue.isNotEmpty
-          ? _downloadQueue.first.videoId
-          : null;
+      ? _downloadQueue.first.videoId
+      : null;
 
   Future<void> initialize() async {
     final appDocDir = await getApplicationDocumentsDirectory();
@@ -71,21 +70,35 @@ class DownloadService with ChangeNotifier {
         await file.writeAsBytes(response.bodyBytes);
         print('Downloaded song path: $filePath');
 
-        // Save metadata as JSON (simplified - no separate album art)
+        // Extract metadata including album art from the downloaded MP3
+        Uint8List? albumArtBytes;
+        try {
+          print('DownloadService: Attempting to extract metadata from file: ${file.path}');
+          final mp3Metadata = await MetadataRetriever.fromFile(file);
+          albumArtBytes = mp3Metadata.albumArt;
+          print('DownloadService: Album art extracted: ${albumArtBytes != null ? '${albumArtBytes.length} bytes' : 'null'}');
+
+          // Log all available metadata properties
+          print('DownloadService: Metadata extracted successfully, albumArt present: ${mp3Metadata.albumArt != null}');
+        } catch (e) {
+          print('DownloadService: Error extracting album art during download for ${video.title}: $e');
+        }
+
+        // Save metadata as JSON including album art if available
         final metadata = {
           'title': video.title,
           'channel': video.channelTitle,
           'artist': video.channelTitle,
           'video_id': video.videoId,
+          'albumArt': albumArtBytes != null
+              ? base64Encode(albumArtBytes)
+              : null,
         };
         final metadataPath = '$_downloadDirectory/$sanitizedTitle.json';
         final metadataFile = File(metadataPath);
         await metadataFile.writeAsString(json.encode(metadata));
 
-        developer.log(
-          'Successfully downloaded: ${video.title} to $filePath',
-          name: 'DownloadService',
-        );
+        print('DownloadService: Successfully downloaded: ${video.title} to $filePath');
 
         _downloadQueue.removeFirst();
 
@@ -102,15 +115,14 @@ class DownloadService with ChangeNotifier {
 
         _libraryProvider?.loadSongs();
       } else {
-        throw Exception('Failed to download: ${response.statusCode} - ${response.body}');
+        throw Exception(
+          'Failed to download: ${response.statusCode} - ${response.body}',
+        );
       }
     } catch (e, s) {
-      developer.log(
-        'Download failed for ${video.title}',
-        name: 'DownloadService',
-        error: e,
-        stackTrace: s,
-      );
+      print('DownloadService: Download failed for ${video.title}');
+      print('Error: $e');
+      print('Stack trace: $s');
       _downloadQueue.removeFirst();
 
       if (!isQueueScreenVisible) {
@@ -165,22 +177,33 @@ class DownloadService with ChangeNotifier {
             metadata = json.decode(metadataContent);
           }
         } catch (e) {
-          developer.log(
-            'Error loading metadata for ${file.path}: $e',
-            name: 'DownloadService',
-          );
+          print('DownloadService: Error loading metadata for ${file.path}: $e');
         }
 
-        // Extract album art from MP3 file
+        // Try to get album art from metadata first, then from MP3 file if not found
         Uint8List? albumArtBytes;
-        try {
-          final mp3Metadata = await MetadataRetriever.fromFile(file);
-          albumArtBytes = mp3Metadata.albumArt;
-        } catch (e) {
-          developer.log(
-            'Error extracting album art from ${file.path}: $e',
-            name: 'DownloadService',
-          );
+        if (metadata?['albumArt'] != null) {
+          try {
+            print('DownloadService: Found albumArt in metadata for ${file.path}');
+            albumArtBytes = base64Decode(metadata!['albumArt']);
+            print('DownloadService: Successfully decoded albumArt from metadata: ${albumArtBytes.length} bytes');
+          } catch (e) {
+            print('DownloadService: Error decoding album art from metadata for ${file.path}: $e');
+          }
+        } else {
+          print('DownloadService: No albumArt found in metadata for ${file.path}');
+        }
+
+        // If no album art in metadata, try extracting from MP3 file
+        if (albumArtBytes == null) {
+          try {
+            print('DownloadService: Attempting to extract album art from MP3 file: ${file.path}');
+            final mp3Metadata = await MetadataRetriever.fromFile(file);
+            albumArtBytes = mp3Metadata.albumArt;
+            print('DownloadService: MP3 metadata extraction result: albumArt ${albumArtBytes != null ? '${albumArtBytes.length} bytes found' : 'not found'}');
+          } catch (e) {
+            print('DownloadService: Error extracting album art from ${file.path}: $e');
+          }
         }
 
         // Derive display name from filename
@@ -253,7 +276,7 @@ class DownloadService with ChangeNotifier {
   Future<void> deleteSong(String path) async {
     final file = File(path);
     if (await file.exists()) await file.delete();
-    
+
     // Delete associated metadata file
     final baseName = path.replaceAll('.mp3', '');
     final metadataPath = '$baseName.json';

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -256,8 +257,23 @@ class SongCard extends StatelessWidget {
         stream: musicPlayerProvider.sequenceStateStream,
         builder: (context, snapshot) {
           final mediaItem = snapshot.data?.currentSource?.tag as MediaItem?;
-          final effectiveBytes =
-              mediaItem?.extras?['albumArt'] as Uint8List? ?? albumArtBytes;
+          Uint8List? effectiveBytes;
+          // Try to get album art from mediaItem extras
+          if (mediaItem?.extras?['albumArt'] is Uint8List) {
+            effectiveBytes = mediaItem?.extras?['albumArt'] as Uint8List?;
+          } else if (mediaItem?.extras?['artUri'] != null) {
+            // Try to get from artUri if it's a base64 data URI
+            final artUri = mediaItem?.extras?['artUri'] as String?;
+            if (artUri != null && artUri.startsWith('data:image')) {
+              try {
+                final base64Data = artUri.split(',')[1];
+                effectiveBytes = base64Decode(base64Data);
+              } catch (e) {
+                debugPrint('Error decoding base64 album art: $e');
+              }
+            }
+          }
+          effectiveBytes ??= albumArtBytes;
           return _buildAlbumArt(effectiveBytes, compact);
         },
       );
@@ -267,26 +283,28 @@ class SongCard extends StatelessWidget {
   }
 
   Widget _buildAlbumArt(Uint8List? albumArtBytes, bool compact) {
+    debugPrint(
+      'SongCard: Building album art, bytes: ${albumArtBytes != null ? '${albumArtBytes.length} bytes' : 'null'}',
+    );
     if (albumArtBytes != null) {
+      debugPrint('SongCard: Attempting to display album art image');
       return Image.memory(
         albumArtBytes,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _buildPlaceholder(Icons.broken_image),
+        errorBuilder: (context, error, stack) {
+          debugPrint('SongCard: Error building album art image: $error');
+          return _buildPlaceholder(Icons.broken_image);
+        },
       );
     }
+    debugPrint('SongCard: No album art bytes available, showing placeholder');
     return _buildPlaceholder(Icons.music_note);
   }
 
   Widget _buildPlaceholder(IconData icon) {
     return Container(
       color: Colors.grey.shade800,
-      child: Center(
-        child: Icon(
-          icon,
-          size: 32,
-          color: Colors.grey.shade600,
-        ),
-      ),
+      child: Center(child: Icon(icon, size: 32, color: Colors.grey.shade600)),
     );
   }
 }

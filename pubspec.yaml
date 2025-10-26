@@ -17,7 +17,7 @@ dependencies:
   provider: ^6.1.5+1
   google_fonts: ^6.3.2
   oktoast: ^3.4.0
-  flutter_media_metadata: ^1.0.0
+  flutter_media_metadata: ^1.0.0+1
 
   rxdart: any
 dev_dependencies:

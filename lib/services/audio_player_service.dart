@@ -73,7 +73,7 @@ class AudioPlayerService {
   /// Converts album art bytes to a URI for MediaItem
   Uri? _albumArtToUri(Uint8List? albumArt) {
     if (albumArt == null) return null;
-    
+
     // Convert bytes to base64 data URI
     final base64String = base64Encode(albumArt);
     return Uri.parse('data:image/jpeg;base64,$base64String');
@@ -102,7 +102,10 @@ class AudioPlayerService {
           title: songData.title,
           artist: songData.artist,
           artUri: _albumArtToUri(songData.albumArt),
-          extras: song,
+          extras: {
+            ...song,
+            'artUri': _albumArtToUri(songData.albumArt)?.toString(),
+          },
         );
         final uri = songData.path.startsWith('http')
             ? Uri.parse(songData.path)
@@ -124,7 +127,10 @@ class AudioPlayerService {
       title: songData.title,
       artist: songData.artist,
       artUri: _albumArtToUri(songData.albumArt),
-      extras: song,
+      extras: {
+        ...song,
+        'artUri': _albumArtToUri(songData.albumArt)?.toString(),
+      },
     );
     final uri = songData.path.startsWith('http')
         ? Uri.parse(songData.path)
