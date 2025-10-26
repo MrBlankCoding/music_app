@@ -426,5 +426,34 @@ class DownloadService with ChangeNotifier {
     if (await file.exists()) await file.delete();
   }
 
+  Future<String> downloadPlaylistSong(
+      String playlistId, Map<String, dynamic> song) async {
+    if (_downloadDirectory == null) await initialize();
+
+    final videoId = song['video_id'];
+    final title = song['title'];
+    final sanitizedTitle = title
+        .replaceAll(RegExp(r'[^\w\s-]'), '')
+        .replaceAll(RegExp(r'\s+'), '_');
+    final uniqueFilename = '${sanitizedTitle}_$videoId';
+    final outputPath = '$_downloadDirectory/$uniqueFilename.mp3';
+    final metadataPath = '$_downloadDirectory/$uniqueFilename.json';
+    final file = File(outputPath);
+
+    final fileUrl = '$_serverUrl/download-playlist-file/$playlistId/$videoId';
+    final fileResponse = await http.get(Uri.parse(fileUrl));
+
+    if (fileResponse.statusCode == 200) {
+      await file.writeAsBytes(fileResponse.bodyBytes);
+
+      final metadataFile = File(metadataPath);
+      await metadataFile.writeAsString(json.encode(song));
+
+      return file.path;
+    } else {
+      throw Exception('Failed to download file from server');
+    }
+  }
+
   String get downloadDirectory => _downloadDirectory ?? '';
 }

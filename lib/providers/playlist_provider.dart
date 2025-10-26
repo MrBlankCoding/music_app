@@ -43,6 +43,17 @@ class PlaylistProvider with ChangeNotifier {
     }
   }
 
+  Future<Playlist?> addPlaylist(Map<String, dynamic> playlistData) async {
+    try {
+      final playlist = await _playlistService.addPlaylist(playlistData);
+      _playlists.add(playlist);
+      notifyListeners();
+      return playlist;
+    } catch (e) {
+      return null;
+    }
+  }
+
   Future<void> deletePlaylist(String playlistId) async {
     try {
       await _playlistService.deletePlaylist(playlistId);

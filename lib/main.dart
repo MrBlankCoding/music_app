@@ -12,6 +12,8 @@ import 'services/download_service.dart';
 import 'screens/home_screen.dart';
 import 'theme.dart';
 
+import 'services/youtube_service.dart';
+
 final RouteObserver<ModalRoute<void>> routeObserver =
     RouteObserver<ModalRoute<void>>();
 
@@ -27,10 +29,12 @@ Future<void> main() async {
   );
 
   final musicPlayerProvider = MusicPlayerProvider();
+  final youTubeService = YouTubeService(apiKey: dotenv.env['YOUTUBE_API_KEY']!);
 
   runApp(
     MultiProvider(
       providers: [
+        Provider.value(value: youTubeService),
         ChangeNotifierProvider.value(value: musicPlayerProvider),
         ChangeNotifierProvider(create: (_) => LibraryProvider()),
         ChangeNotifierProvider(create: (_) => PlaylistProvider()),

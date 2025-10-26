@@ -64,6 +64,16 @@ class PlaylistService {
     return playlist;
   }
 
+  Future<Playlist> addPlaylist(Map<String, dynamic> playlistData) async {
+    if (_playlistsFile == null) await initialize();
+
+    final playlist = Playlist.fromJson(playlistData);
+
+    _playlists.add(playlist);
+    await _savePlaylists();
+    return playlist;
+  }
+
   Future<void> deletePlaylist(String playlistId) async {
     _playlists.removeWhere((p) => p.id == playlistId);
     await _savePlaylists();

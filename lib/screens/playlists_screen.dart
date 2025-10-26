@@ -342,75 +342,90 @@ class _PlaylistInfo extends StatelessWidget {
   }
 }
 
-class _PlaylistOptionsButton extends StatelessWidget {
+class _PlaylistOptionsButton extends StatefulWidget {
   final Playlist playlist;
 
   const _PlaylistOptionsButton({required this.playlist});
 
   @override
+  State<_PlaylistOptionsButton> createState() => _PlaylistOptionsButtonState();
+}
+
+class _PlaylistOptionsButtonState extends State<_PlaylistOptionsButton> {
+  bool _isMenuOpen = false;
+
+  @override
+  void dispose() {
+    _isMenuOpen = false;
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return IconButton(
       icon: const Icon(Icons.more_vert),
-      onPressed: () {
-        showModalBottomSheet(
-          context: context,
-          builder: (context) => SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  leading: Icon(
-                    Icons.delete,
-                    color: Theme.of(context).colorScheme.error,
-                  ),
-                  title: Text(
-                    'Delete Playlist',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-                  onTap: () async {
-                    Navigator.pop(context);
-                    final confirmed = await showDialog<bool>(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('Delete Playlist'),
-                        content: Text('Delete "${playlist.name}"?'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, false),
-                            child: const Text('Cancel'),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, true),
-                            style: TextButton.styleFrom(
-                              foregroundColor: Theme.of(
-                                context,
-                              ).colorScheme.error,
-                            ),
-                            child: const Text('Delete'),
-                          ),
-                        ],
-                      ),
-                    );
-
-                    if (context.mounted && confirmed == true) {
-                      await context.read<PlaylistProvider>().deletePlaylist(
-                        playlist.id,
-                      );
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('"${playlist.name}" deleted')),
-                        );
-                      }
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+      onPressed: _isMenuOpen ? null : () => _showOptions(context),
     );
+  }
+
+  Future<void> _showOptions(BuildContext parentContext) async {
+    if (_isMenuOpen) return;
+
+    setState(() {
+      _isMenuOpen = true;
+    });
+
+    try {
+      await showModalBottomSheet(
+        context: parentContext,
+        isScrollControlled: true,
+        builder: (sheetContext) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: Icon(
+                  Icons.delete,
+                  color: Theme.of(sheetContext).colorScheme.error,
+                ),
+                title: Text(
+                  'Delete Playlist',
+                  style: TextStyle(
+                    color: Theme.of(sheetContext).colorScheme.error,
+                  ),
+                ),
+                onTap: () async {
+                  Navigator.pop(sheetContext);
+                  final confirmed = await PlaylistDialogs.showDeletePlaylistConfirmationDialog(
+                    parentContext,
+                    widget.playlist.name,
+                  );
+
+                  if (!parentContext.mounted || !confirmed) {
+                    return;
+                  }
+
+                  await parentContext.read<PlaylistProvider>().deletePlaylist(
+                    widget.playlist.id,
+                  );
+
+                  if (parentContext.mounted) {
+                    ScaffoldMessenger.of(parentContext).showSnackBar(
+                      SnackBar(content: Text('"${widget.playlist.name}" deleted')),
+                    );
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isMenuOpen = false;
+        });
+      }
+    }
   }
 }

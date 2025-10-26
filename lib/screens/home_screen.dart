@@ -10,6 +10,8 @@ import 'library_screen.dart';
 import 'playlists_screen.dart';
 import 'download_queue_screen.dart';
 
+import '../services/youtube_service.dart';
+
 class HomeScreen extends StatefulWidget {
   final int initialIndex;
 
@@ -45,6 +47,90 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   final List<String> _titles = ['Search', 'Library', 'Playlists'];
+
+  Future<void> _showDownloadPlaylistDialog(BuildContext context) async {
+    final youtubeService = context.read<YouTubeService>();
+    final playlistProvider = context.read<PlaylistProvider>();
+    final libraryProvider = context.read<LibraryProvider>();
+    final downloadService = context.read<DownloadService>();
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final urlController = TextEditingController();
+
+    final url = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Download Playlist'),
+          content: TextField(
+            controller: urlController,
+            decoration: const InputDecoration(
+              hintText: 'Enter YouTube Playlist URL',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(urlController.text);
+              },
+              child: const Text('Download'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (url != null && url.isNotEmpty) {
+      try {
+        scaffoldMessenger.showSnackBar(
+          const SnackBar(content: Text('Starting playlist download...')),
+        );
+
+        String? playlistId;
+
+        await for (var event in youtubeService.downloadPlaylistStream(url)) {
+          final status = event['status'];
+
+          if (status == 'starting') {
+            playlistId = event['playlist_id'];
+            final playlistName = event['playlist_title'];
+            final transformedPlaylist = {
+              'id': playlistId,
+              'name': playlistName,
+              'createdAt': DateTime.now().toIso8601String(),
+              'songs': [],
+            };
+            await playlistProvider.addPlaylist(transformedPlaylist);
+          } else if (status == 'song_downloaded') {
+            if (playlistId != null) {
+              final song = event;
+              final localPath = await downloadService.downloadPlaylistSong(playlistId, song);
+              final newSong = Map<String, dynamic>.from(song);
+              newSong['path'] = localPath;
+              await playlistProvider.addSongToPlaylist(playlistId, newSong);
+              libraryProvider.loadSongs(); // Refresh library to get thumbnail
+            }
+          } else if (status == 'finished') {
+            scaffoldMessenger.showSnackBar(
+              const SnackBar(content: Text('Playlist download finished')),
+            );
+          } else if (status == 'error') {
+            scaffoldMessenger.showSnackBar(
+              SnackBar(content: Text('Error downloading playlist: ${event['message']}')),
+            );
+          }
+        }
+      } catch (e) {
+        print('Error downloading playlist: $e');
+        scaffoldMessenger.showSnackBar(
+          SnackBar(content: Text('Failed to download playlist: $e')),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -103,6 +189,13 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: const Icon(Icons.refresh),
               onPressed: () => context.read<PlaylistProvider>().loadPlaylists(),
             ),
+
+          if (_selectedIndex == 0) ...[
+            IconButton(
+              icon: const Icon(Icons.playlist_add),
+              onPressed: () => _showDownloadPlaylistDialog(context),
+            ),
+          ],
 
           Selector<DownloadService, int>(
             selector: (_, service) => service.downloadQueue.length,
