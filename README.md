@@ -1,18 +1,12 @@
 # Simple Music App Built With Flutter
 
-You can search for music and download it locally to your device using YT-DLP. Needs UI help if someone would like to do that. 
+You can search for music and download it locally to your device using a custom download API. Needs UI help if someone would like to do that. 
 
+## How to run the Download API
 
-## Prerequisites
-1. YT API v3 API key
-    -(Its free and its needed for searching YT)
-
-## ENV
-Create your .env in the root
-
-```env
-YOUTUBE_API_KEY=YOUR_API_KEY_HERE
-```
+1.  Navigate to the `DownloadAPI` directory.
+2.  Install the required dependencies by running `pip install -r requirements.txt`.
+3.  Run the API using `uvicorn main:app --host 0.0.0.0 --port 8000 --reload`.
 
 ## Errors
 If anything is going wrong it is most likely one of three things. 

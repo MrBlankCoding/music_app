@@ -3,34 +3,23 @@ class YouTubeVideo {
   final String title;
   final String channelTitle;
   final String thumbnailUrl;
-  final DateTime publishedAt;
+  final String duration;
 
   YouTubeVideo({
     required this.videoId,
     required this.title,
     required this.channelTitle,
     required this.thumbnailUrl,
-    required this.publishedAt,
+    required this.duration,
   });
 
   factory YouTubeVideo.fromJson(Map<String, dynamic> json) {
-    final id = json['id'];
-    final snippet = json['snippet'];
-
-    final videoId = id is Map ? id['videoId'] ?? '' : id?.toString() ?? '';
-    final thumbnails = snippet['thumbnails'];
-
     return YouTubeVideo(
-      videoId: videoId,
-      title: snippet['title'] ?? 'Unknown',
-      channelTitle: snippet['channelTitle'] ?? 'Unknown',
-      thumbnailUrl:
-          thumbnails?['high']?['url'] ??
-          thumbnails?['medium']?['url'] ??
-          thumbnails?['default']?['url'] ??
-          '',
-      publishedAt:
-          DateTime.tryParse(snippet['publishedAt'] ?? '') ?? DateTime.now(),
+      videoId: json['videoId'] ?? '',
+      title: json['title'] ?? 'Unknown',
+      channelTitle: json['channelTitle'] ?? 'Unknown',
+      thumbnailUrl: json['thumbnail'] ?? '',
+      duration: json['duration'] ?? 'Unknown',
     );
   }
 }

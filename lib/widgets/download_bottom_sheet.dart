@@ -41,21 +41,11 @@ class DownloadBottomSheet extends StatelessWidget {
             const SizedBox(height: 24),
             Consumer<DownloadService>(
               builder: (context, downloadService, child) {
-                final progress =
-                    downloadService.downloadProgress[video.videoId];
                 final isQueued = downloadService.downloadQueue.any(
                   (v) => v.videoId == video.videoId,
                 );
 
-                if (progress != null) {
-                  return Column(
-                    children: [
-                      LinearProgressIndicator(value: progress),
-                      const SizedBox(height: 8),
-                      Text('${(progress * 100).toStringAsFixed(0)}%'),
-                    ],
-                  );
-                } else if (isQueued) {
+                if (isQueued) {
                   return const Chip(label: Text('Queued'));
                 } else {
                   return ElevatedButton.icon(

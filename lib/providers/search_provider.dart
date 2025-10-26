@@ -1,11 +1,9 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:http/http.dart' as http;
 import '../models/youtube_video.dart';
-import '../services/youtube_service.dart';
 
 class SearchProvider with ChangeNotifier {
-  final YouTubeService _youtubeService;
-
   List<YouTubeVideo> _videos = [];
   bool _isLoading = false;
   String _query = '';
@@ -17,14 +15,9 @@ class SearchProvider with ChangeNotifier {
   String get query => _query;
   List<String> get recentSearches => List.unmodifiable(_recentSearches);
 
-  SearchProvider({YouTubeService? youtubeService})
-      : _youtubeService = youtubeService ??
-            YouTubeService(apiKey: dotenv.env['YOUTUBE_API_KEY'] ?? '');
-
   Future<void> search(String query) async {
     if (query.trim().isEmpty) return;
 
-    // Record in recent history (dedupe, most-recent-first, max 5)
     final q = query.trim();
     _recentSearches.removeWhere((e) => e.toLowerCase() == q.toLowerCase());
     _recentSearches.insert(0, q);
@@ -37,9 +30,16 @@ class SearchProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      _videos = await _youtubeService.searchVideos(q);
+      final response = await http.get(Uri.parse('http://127.0.0.1:8000/search?query=$q'));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final items = data['videos'] as List;
+        _videos = items.map((item) => YouTubeVideo.fromJson(item)).toList();
+      } else {
+        _videos = [];
+      }
     } catch (e) {
-      // Handle error
+      _videos = [];
     } finally {
       _isLoading = false;
       notifyListeners();

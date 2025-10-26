@@ -26,74 +26,61 @@ class _MusicCardState extends State<MusicCard> {
   @override
   Widget build(BuildContext context) {
     final downloadService = context.watch<DownloadService>();
-    final progress = downloadService.downloadProgress[widget.video.videoId];
-    final isQueued = downloadService.downloadQueue.any(
-      (v) => v.videoId == widget.video.videoId,
-    );
-    final isDownloading = progress != null;
-
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      leading: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: CachedNetworkImage(
-          imageUrl: widget.video.thumbnailUrl,
-          width: 80,
-          height: 60,
-          fit: BoxFit.cover,
-          placeholder: (context, url) => Container(
-            width: 80,
-            height: 60,
-            color: Theme.of(context).colorScheme.surfaceContainerHigh,
-            child: Icon(
-              Icons.music_note,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+        final isDownloading =
+            downloadService.currentlyDownloadingVideoId == widget.video.videoId;
+        final isQueued = downloadService.downloadQueue
+            .any((v) => v.videoId == widget.video.videoId);
+    
+        return ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          leading: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: CachedNetworkImage(
+              imageUrl: widget.video.thumbnailUrl,
+              width: 80,
+              height: 60,
+              fit: BoxFit.cover,
+              placeholder: (context, url) => Container(
+                width: 80,
+                height: 60,
+                color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                child: Icon(
+                  Icons.music_note,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              errorWidget: (context, url, error) => Container(
+                width: 80,
+                height: 60,
+                color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                child: Icon(
+                  Icons.broken_image,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
             ),
           ),
-          errorWidget: (context, url, error) => Container(
-            width: 80,
-            height: 60,
-            color: Theme.of(context).colorScheme.surfaceContainerHigh,
-            child: Icon(
-              Icons.broken_image,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
+          title: Text(
+            widget.video.title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
-        ),
-      ),
-      title: Text(
-        widget.video.title,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
+          subtitle: Text(
             widget.video.channelTitle,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          if (isDownloading) ...[
-            const SizedBox(height: 6),
-            LinearProgressIndicator(value: progress),
-            const SizedBox(height: 4),
-            Text('${(progress * 100).toStringAsFixed(0)}%'),
-          ],
-        ],
-      ),
-      trailing: isDownloading
-          ? const SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : isQueued
-          ? const Chip(label: Text('Queued'))
-          : const Icon(Icons.download),
-      enabled: !isDownloading,
-      onTap: () => _showDownloadSheet(context),
-      onLongPress: () {
+          trailing: isDownloading
+              ? const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : isQueued
+                  ? const Chip(label: Text('Queued'))
+                  : const Icon(Icons.download),
+          enabled: !isQueued,
+          onTap: () => _showDownloadSheet(context),      onLongPress: () {
         showModalBottomSheet(
           context: context,
           isScrollControlled: true,

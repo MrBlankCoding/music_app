@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 import 'package:oktoast/oktoast.dart';
 import 'package:just_audio_background/just_audio_background.dart';
@@ -12,15 +11,13 @@ import 'services/download_service.dart';
 import 'theme.dart';
 
 import 'screens/home_screen.dart';
-import 'services/youtube_service.dart';
+
 
 final RouteObserver<ModalRoute<void>> routeObserver =
     RouteObserver<ModalRoute<void>>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: ".env");
-
   // Initialize background audio (required for lock screen metadata & controls)
   await JustAudioBackground.init(
     androidNotificationChannelId: 'com.musicapp.channel.audio',
@@ -29,12 +26,10 @@ Future<void> main() async {
   );
 
   final musicPlayerProvider = MusicPlayerProvider();
-  final youTubeService = YouTubeService(apiKey: dotenv.env['YOUTUBE_API_KEY']!);
 
   runApp(
     MultiProvider(
       providers: [
-        Provider.value(value: youTubeService),
         ChangeNotifierProvider.value(value: musicPlayerProvider),
         ChangeNotifierProvider(create: (_) => LibraryProvider()),
         ChangeNotifierProvider(create: (_) => PlaylistProvider()),

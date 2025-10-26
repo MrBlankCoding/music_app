@@ -14,7 +14,6 @@ class MusicSearchScreen extends StatefulWidget {
 
 class _MusicSearchScreenState extends State<MusicSearchScreen> {
   final TextEditingController _searchController = TextEditingController();
-  Timer? _debounce;
 
   @override
   void initState() {
@@ -28,7 +27,6 @@ class _MusicSearchScreenState extends State<MusicSearchScreen> {
 
   @override
   void dispose() {
-    _debounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -43,14 +41,14 @@ class _MusicSearchScreenState extends State<MusicSearchScreen> {
           controller: _searchController,
           hintText: 'Search music...',
           onChanged: (query) {
-            _debounce?.cancel();
             if (query.trim().isEmpty) {
               searchProvider.clearSearch();
-              return;
             }
-            _debounce = Timer(const Duration(milliseconds: 450), () {
+          },
+          onSubmitted: (query) {
+            if (query.trim().isNotEmpty) {
               searchProvider.search(query);
-            });
+            }
           },
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
