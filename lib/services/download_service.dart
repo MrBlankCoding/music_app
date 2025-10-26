@@ -56,12 +56,36 @@ class DownloadService with ChangeNotifier {
     final video = _downloadQueue.first;
 
     try {
-      // Changed to GET request with video_id in the path
+      // Make GET request to download endpoint
       final response = await http.get(
         Uri.parse('$_serverUrl/download/${video.videoId}'),
       );
 
       if (response.statusCode == 200) {
+        // Save the audio file
+        final sanitizedTitle = _sanitizeFilename(video.title);
+        final filePath = '$_downloadDirectory/$sanitizedTitle.mp3';
+        final file = File(filePath);
+        await file.writeAsBytes(response.bodyBytes);
+        print('Downloaded song path: $filePath');
+
+        // Save metadata as JSON
+        final metadata = {
+          'title': video.title,
+          'channel': video.channelTitle,
+          'artist': video.channelTitle,
+          'thumbnail_url': video.thumbnailUrl,
+          'video_id': video.videoId,
+        };
+        final metadataPath = '$_downloadDirectory/$sanitizedTitle.json';
+        final metadataFile = File(metadataPath);
+        await metadataFile.writeAsString(json.encode(metadata));
+
+        developer.log(
+          'Successfully downloaded: ${video.title} to $filePath',
+          name: 'DownloadService',
+        );
+
         _downloadQueue.removeFirst();
 
         if (!isQueueScreenVisible) {
@@ -77,7 +101,7 @@ class DownloadService with ChangeNotifier {
 
         _libraryProvider?.loadSongs();
       } else {
-        throw Exception('Failed to download: ${response.body}');
+        throw Exception('Failed to download: ${response.statusCode} - ${response.body}');
       }
     } catch (e, s) {
       developer.log(
@@ -103,6 +127,14 @@ class DownloadService with ChangeNotifier {
       notifyListeners();
       _processQueue();
     }
+  }
+
+  String _sanitizeFilename(String filename) {
+    // Remove or replace invalid filename characters
+    return filename
+        .replaceAll(RegExp(r'[<>:"/\\|?*]'), '')
+        .replaceAll(RegExp(r'\s+'), '_')
+        .trim();
   }
 
   Future<List<Map<String, dynamic>>> getDownloadedSongs() async {
