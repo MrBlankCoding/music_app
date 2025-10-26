@@ -49,13 +49,12 @@ class PlaylistService {
     return List.from(_playlists);
   }
 
-  Future<Playlist> createPlaylist(String name, {String? description}) async {
+  Future<Playlist> createPlaylist(String name) async {
     if (_playlistsFile == null) await initialize();
 
     final playlist = Playlist(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       name: name,
-      description: description,
       createdAt: DateTime.now(),
       songs: [],
     );

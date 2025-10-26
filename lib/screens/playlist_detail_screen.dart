@@ -261,17 +261,6 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
               child: _buildPlaylistArtwork(context, playlist, libraryProvider),
             ),
           ),
-          if (playlist.description != null) ...[
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Text(
-                playlist.description!,
-                style: Theme.of(context).textTheme.bodyLarge,
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ],
           const SizedBox(height: 8),
           Expanded(
             child: songs.isEmpty

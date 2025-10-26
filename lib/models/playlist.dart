@@ -1,7 +1,6 @@
 class Playlist {
   final String id;
   final String name;
-  final String? description;
   final DateTime createdAt;
   final List<Map<String, dynamic>>
   songs; // Store complete song objects with metadata
@@ -9,7 +8,6 @@ class Playlist {
   Playlist({
     required this.id,
     required this.name,
-    this.description,
     required this.createdAt,
     required this.songs,
   });
@@ -40,7 +38,6 @@ class Playlist {
     return Playlist(
       id: json['id'] as String,
       name: json['name'] as String,
-      description: json['description'] as String?,
       createdAt: DateTime.parse(json['createdAt'] as String),
       songs: songsList,
     );
@@ -50,7 +47,6 @@ class Playlist {
     return {
       'id': id,
       'name': name,
-      'description': description,
       'createdAt': createdAt.toIso8601String(),
       'songs': songs.map((song) {
         // Ensure DateTime objects are serialized as strings
@@ -67,14 +63,12 @@ class Playlist {
   Playlist copyWith({
     String? id,
     String? name,
-    String? description,
     DateTime? createdAt,
     List<Map<String, dynamic>>? songs,
   }) {
     return Playlist(
       id: id ?? this.id,
       name: name ?? this.name,
-      description: description ?? this.description,
       createdAt: createdAt ?? this.createdAt,
       songs: songs ?? this.songs,
     );

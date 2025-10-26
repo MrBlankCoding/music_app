@@ -9,7 +9,6 @@ class PlaylistDialogs {
     {Map<String, dynamic>? initialSong}
   ) async {
     final nameController = TextEditingController();
-    final descriptionController = TextEditingController();
     final playlistProvider = context.read<PlaylistProvider>();
 
     final result = await showDialog<bool>(
@@ -26,15 +25,6 @@ class PlaylistDialogs {
                 border: OutlineInputBorder(),
               ),
               autofocus: true,
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: descriptionController,
-              decoration: const InputDecoration(
-                labelText: 'Description (optional)',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 2,
             ),
           ],
         ),
@@ -55,9 +45,6 @@ class PlaylistDialogs {
       try {
         final playlist = await playlistProvider.createPlaylist(
           nameController.text,
-          description: descriptionController.text.isEmpty
-              ? null
-              : descriptionController.text,
         );
         if (context.mounted && playlist != null && initialSong != null) {
           await playlistProvider.addSongToPlaylist(playlist.id, initialSong);
@@ -176,9 +163,6 @@ class PlaylistDialogs {
     Playlist playlist,
   ) async {
     final nameController = TextEditingController(text: playlist.name);
-    final descriptionController = TextEditingController(
-      text: playlist.description ?? '',
-    );
 
     final result = await showDialog<bool>(
       context: context,
@@ -193,15 +177,6 @@ class PlaylistDialogs {
                 labelText: 'Playlist Name',
                 border: OutlineInputBorder(),
               ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: descriptionController,
-              decoration: const InputDecoration(
-                labelText: 'Description (optional)',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 2,
             ),
           ],
         ),
@@ -221,9 +196,6 @@ class PlaylistDialogs {
     if (result == true && nameController.text.isNotEmpty && context.mounted) {
       final updatedPlaylist = playlist.copyWith(
         name: nameController.text,
-        description: descriptionController.text.isEmpty
-            ? null
-            : descriptionController.text,
       );
       await context.read<PlaylistProvider>().updatePlaylist(updatedPlaylist);
       
@@ -238,7 +210,6 @@ class PlaylistDialogs {
     }
 
     nameController.dispose();
-    descriptionController.dispose();
   }
 
   static Future<bool> showDeletePlaylistConfirmationDialog(

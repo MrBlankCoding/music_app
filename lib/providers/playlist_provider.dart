@@ -28,11 +28,10 @@ class PlaylistProvider with ChangeNotifier {
     }
   }
 
-  Future<Playlist?> createPlaylist(String name, {String? description}) async {
+  Future<Playlist?> createPlaylist(String name) async {
     try {
       final playlist = await _playlistService.createPlaylist(
         name,
-        description: description,
       );
       // Mutate local state instead of reloading from disk
       _playlists.add(playlist);

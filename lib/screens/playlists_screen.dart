@@ -321,17 +321,6 @@ class _PlaylistInfo extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        if (playlist.description != null) ...[
-          const SizedBox(height: 4),
-          Text(
-            playlist.description!,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
         const SizedBox(height: 8),
         Row(
           children: [
