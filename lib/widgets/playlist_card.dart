@@ -26,7 +26,7 @@ class _PlaylistCardState extends State<PlaylistCard> {
 
     try {
       final response = await http.post(
-        Uri.parse('https://2c1783657af6.ngrok-free.app/download_playlist'),
+        Uri.parse('https://lasandra-sultriest-bumblingly.ngrok-free.dev/download_playlist'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
           'playlist_id': widget.playlist.playlistId,

@@ -36,7 +36,7 @@ class SearchProvider with ChangeNotifier {
 
     try {
       final response = await http.get(
-        Uri.parse('https://2c1783657af6.ngrok-free.app/search?query=$q'),
+        Uri.parse('https://lasandra-sultriest-bumblingly.ngrok-free.dev/search?query=$q'),
       );
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -81,7 +81,7 @@ class SearchProvider with ChangeNotifier {
 
     try {
       final response = await http.get(
-        Uri.parse('https://2c1783657af6.ngrok-free.app/search_playlists?query=$q'),
+        Uri.parse('https://lasandra-sultriest-bumblingly.ngrok-free.dev/search_playlists?query=$q'),
       );
 
       if (response.statusCode == 200) {
