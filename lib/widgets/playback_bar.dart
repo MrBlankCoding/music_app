@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
+import 'package:audio_video_progress_bar/audio_video_progress_bar.dart';
 import '../providers/music_player_provider.dart';
 import '../screens/full_player_screen.dart';
 import '../utils/song_data_helper.dart';
@@ -19,14 +20,10 @@ class PlaybackBar extends StatefulWidget {
 
 class _PlaybackBarState extends State<PlaybackBar>
     with TickerProviderStateMixin {
-  static const double _barHeight = 4.0;
-  static const double _dotSize = 12.0;
   static const double _swipeThreshold = 50.0;
 
   double _horizontalDragDx = 0.0;
   double _swipeOffset = 0.0;
-  bool _isDraggingProgress = false;
-  double? _seekFraction;
   late AnimationController _swipeAnimationController;
   late AnimationController _marqueeController;
 
@@ -87,22 +84,6 @@ class _PlaybackBarState extends State<PlaybackBar>
     });
   }
 
-  void _updateSeekPosition(double fraction) {
-    setState(() => _seekFraction = fraction.clamp(0.0, 1.0));
-  }
-
-  void _commitSeek(MusicPlayerProvider provider, Duration? duration) {
-    if (_seekFraction != null && duration != null) {
-      final totalMs = duration.inMilliseconds;
-      final clampedFraction = _seekFraction!.clamp(0.0, 0.999);
-      final targetMs = (totalMs * clampedFraction).round();
-      provider.seek(Duration(milliseconds: targetMs));
-    }
-    setState(() {
-      _isDraggingProgress = false;
-      _seekFraction = null;
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -168,48 +149,26 @@ class _PlaybackBarState extends State<PlaybackBar>
           builder: (context, positionSnapshot) {
             final position = positionSnapshot.data ?? Duration.zero;
 
-            double progress = 0.0;
-            if (_isDraggingProgress && _seekFraction != null) {
-              progress = _seekFraction!;
-            } else if (duration.inMilliseconds > 0) {
-              progress = (position.inMilliseconds / duration.inMilliseconds)
-                  .clamp(0.0, 1.0);
-            }
-
-            return SizedBox(
-              height: _barHeight + 8,
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final width = constraints.maxWidth;
-                  final filledWidth = width * progress;
-                  final dotLeft = (filledWidth - (_dotSize / 2)).clamp(
-                    0.0,
-                    width - _dotSize,
-                  );
-
-                  return GestureDetector(
-                    behavior: HitTestBehavior.translucent,
-                    onTapDown: (details) {
-                      setState(() => _isDraggingProgress = true);
-                      _updateSeekPosition(details.localPosition.dx / width);
-                    },
-                    onTapUp: (_) => _commitSeek(provider, duration),
-                    onHorizontalDragStart: (_) =>
-                        setState(() => _isDraggingProgress = true),
-                    onHorizontalDragUpdate: (details) {
-                      _updateSeekPosition(details.localPosition.dx / width);
-                    },
-                    onHorizontalDragEnd: (_) => _commitSeek(provider, duration),
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      alignment: Alignment.center,
-                      children: [
-                        _buildProgressTrack(theme, width, filledWidth),
-                        _buildProgressDot(theme, dotLeft),
-                      ],
-                    ),
-                  );
+            return Container(
+              height: 12,
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: ProgressBar(
+                progress: position,
+                total: duration,
+                buffered: duration,
+                onSeek: (duration) {
+                  provider.seek(duration);
+                  HapticFeedback.lightImpact();
                 },
+                barHeight: 4.0,
+                baseBarColor: theme.colorScheme.surfaceContainerHigh,
+                progressBarColor: theme.colorScheme.primary,
+                bufferedBarColor: theme.colorScheme.surfaceContainerHigh,
+                thumbColor: theme.colorScheme.primary,
+                thumbGlowColor: theme.colorScheme.primary.withValues(alpha: 0.3),
+                thumbRadius: 6.0,
+                thumbGlowRadius: 12.0,
+                timeLabelLocation: TimeLabelLocation.none,
               ),
             );
           },
@@ -218,76 +177,6 @@ class _PlaybackBarState extends State<PlaybackBar>
     );
   }
 
-  Widget _buildProgressTrack(
-    ThemeData theme,
-    double width,
-    double filledWidth,
-  ) {
-    return SizedBox(
-      height: _barHeight,
-      width: width,
-      child: Stack(
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(_barHeight / 2),
-            ),
-          ),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Container(
-              width: filledWidth,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    theme.colorScheme.primary,
-                    theme.colorScheme.primary.withValues(alpha: 0.8),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(_barHeight / 2),
-                boxShadow: [
-                  BoxShadow(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.3),
-                    blurRadius: 4,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProgressDot(ThemeData theme, double dotLeft) {
-    return Positioned(
-      left: dotLeft,
-      child: AnimatedScale(
-        scale: _isDraggingProgress ? 1.3 : 1.0,
-        duration: const Duration(milliseconds: 150),
-        child: Container(
-          width: _dotSize,
-          height: _dotSize,
-          decoration: BoxDecoration(
-            color: theme.colorScheme.primary,
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: theme.colorScheme.surfaceContainerHighest,
-              width: 2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: theme.colorScheme.primary.withValues(alpha: 0.4),
-                blurRadius: 6,
-                spreadRadius: 1,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildContentArea(
     ThemeData theme,

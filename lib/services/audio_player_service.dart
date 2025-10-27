@@ -25,6 +25,8 @@ class AudioPlayerService {
       BehaviorSubject<bool>.seeded(false);
   final BehaviorSubject<List<Map<String, dynamic>>> _playlistSubject =
       BehaviorSubject<List<Map<String, dynamic>>>.seeded([]);
+  final BehaviorSubject<bool> _isLoopEnabledSubject =
+      BehaviorSubject<bool>.seeded(false);
 
   /// Stream of the currently playing song's data.
   ValueStream<Map<String, dynamic>?> get currentSongStream =>
@@ -50,10 +52,14 @@ class AudioPlayerService {
   ValueStream<List<Map<String, dynamic>>> get playlistStream =>
       _playlistSubject.stream;
 
+  /// Stream of the loop mode state.
+  Stream<bool> get isLoopEnabledStream => _isLoopEnabledSubject.stream;
+
   /// The underlying [AudioPlayer] instance.
   AudioPlayer get audioPlayer => _audioPlayer;
 
   void _init() {
+    _audioPlayer.setLoopMode(LoopMode.all);
     _audioPlayer.currentIndexStream.listen((index) {
       if (index != null &&
           _audioPlayer.sequenceState?.sequence.isNotEmpty == true) {
@@ -67,6 +73,10 @@ class AudioPlayerService {
 
     _audioPlayer.shuffleModeEnabledStream.listen((isEnabled) {
       _isShuffleEnabledSubject.add(isEnabled);
+    });
+
+    _audioPlayer.loopModeStream.listen((loopMode) {
+      _isLoopEnabledSubject.add(loopMode == LoopMode.one);
     });
   }
 
@@ -103,6 +113,7 @@ class AudioPlayerService {
     _playlistSubject.add(songs);
 
     final playlist = ConcatenatingAudioSource(
+      useLazyPreparation: true,
       children: songs.map((song) {
         final songData = SongData(song);
         final mediaItem = MediaItem(
@@ -188,11 +199,18 @@ class AudioPlayerService {
     await _audioPlayer.setShuffleModeEnabled(isEnabled);
   }
 
+  /// Toggles loop mode for the current song.
+  Future<void> toggleLoop() async {
+    final isEnabled = _isLoopEnabledSubject.value;
+    await _audioPlayer.setLoopMode(isEnabled ? LoopMode.off : LoopMode.one);
+  }
+
   /// Disposes the audio player.
   void dispose() {
     _audioPlayer.dispose();
     _currentSongSubject.close();
     _isShuffleEnabledSubject.close();
     _playlistSubject.close();
+    _isLoopEnabledSubject.close();
   }
 }

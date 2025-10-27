@@ -35,6 +35,8 @@ class MusicPlayerProvider with ChangeNotifier {
       _audioPlayerService.audioPlayer.shuffleModeEnabled;
   Stream<bool> get isShuffleEnabledStream =>
       _audioPlayerService.isShuffleEnabledStream;
+  Stream<bool> get isLoopEnabledStream =>
+      _audioPlayerService.isLoopEnabledStream;
   Stream<Duration> get positionStream => _audioPlayerService.positionStream;
   Stream<Duration?> get durationStream => _audioPlayerService.durationStream;
   Stream<bool> get playingStream => _audioPlayerService.playingStream;
@@ -75,6 +77,11 @@ class MusicPlayerProvider with ChangeNotifier {
 
   Future<void> toggleShuffle() async {
     await _audioPlayerService.toggleShuffle();
+    notifyListeners();
+  }
+
+  Future<void> toggleLoop() async {
+    await _audioPlayerService.toggleLoop();
     notifyListeners();
   }
 
