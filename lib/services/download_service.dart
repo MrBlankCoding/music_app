@@ -18,7 +18,7 @@ class DownloadService with ChangeNotifier {
   LibraryProvider? _libraryProvider;
   bool isQueueScreenVisible = false;
   String? _downloadDirectory;
-  final String _serverUrl = 'http://127.0.0.1:8000';
+  final String _serverUrl = 'https://2c1783657af6.ngrok-free.app';
   final Queue<YouTubeVideo> _downloadQueue = Queue<YouTubeVideo>();
   bool _isDownloading = false;
 
