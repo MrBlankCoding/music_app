@@ -101,7 +101,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                       onRefresh: () async {
                         await libraryProvider.loadSongs();
                       },
-                      child: libraryProvider.isGridView 
+                          child: libraryProvider.isGridView 
                           ? GridView.builder(
                               padding: const EdgeInsets.all(12),
                               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -123,6 +123,12 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                       musicPlayerProvider.playPause();
                                     }
                                   },
+                                  onAddToQueue: () async {
+                                    await musicPlayerProvider.addToQueue(song);
+                                  },
+                                  onDelete: () async {
+                                    await songManagementService.deleteSong(song['path']);
+                                  },
                                 );
                               },
                             )
@@ -137,6 +143,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                        MusicPlayerProvider musicPlayerProvider, 
                        SongManagementService songManagementService, 
                        BuildContext context) {
+    final libraryProvider = context.watch<LibraryProvider>();
     return ListView.builder(
       padding: const EdgeInsets.only(bottom: 80, left: 12, right: 12, top: 4),
       itemCount: songs.length,
@@ -167,6 +174,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
               musicPlayerProvider.playPause();
             }
           },
+          enableSwipeToDelete: !libraryProvider.isGridView, // Only enable in list view
+          onDelete: () async {
+            await songManagementService.deleteSong(song['path']);
+          },
+          onAddToQueue: !libraryProvider.isGridView ? () async {
+            await musicPlayerProvider.addToQueue(song);
+          } : null,
           menuItems: [
             PopupMenuItem<String>(
               value: 'add_to_playlist',

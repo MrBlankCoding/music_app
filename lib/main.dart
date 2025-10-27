@@ -12,7 +12,6 @@ import 'theme.dart';
 
 import 'screens/home_screen.dart';
 
-
 final RouteObserver<ModalRoute<void>> routeObserver =
     RouteObserver<ModalRoute<void>>();
 
@@ -58,7 +57,7 @@ class MusicSearchApp extends StatelessWidget {
         theme: AppTheme.darkTheme,
         darkTheme: AppTheme.darkTheme,
         themeMode: ThemeMode.dark,
-        home: const HomeScreen(),
+        home: const HomeScreen(initialIndex: 1), // Library is now at index 1
       ),
     );
   }

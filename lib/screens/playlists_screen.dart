@@ -58,7 +58,9 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                 ? const Center(child: CircularProgressIndicator())
                 : playlists.isEmpty
                     ? _buildEmptyState(context)
-                    : _buildPlaylistGrid(context, playlists),
+                    : playlistProvider.isGridView
+                        ? _buildPlaylistGrid(context, playlists)
+                        : _buildPlaylistList(context, playlists),
           ),
         ],
       ),
@@ -124,6 +126,30 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
     );
   }
 
+  Widget _buildPlaylistList(
+    BuildContext context,
+    List<Playlist> playlists,
+  ) {
+    final playlistProvider = context.read<PlaylistProvider>();
+    return RefreshIndicator(
+      onRefresh: playlistProvider.loadPlaylists,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: playlists.length,
+        itemBuilder: (context, index) {
+          final playlist = playlists[index];
+          return _PlaylistListItem(
+            playlist: playlist,
+            onTap: () => _navigateToPlaylistDetail(context, playlist.id),
+            onDelete: () async {
+              await playlistProvider.deletePlaylist(playlist.id);
+            },
+          );
+        },
+      ),
+    );
+  }
+
   void _navigateToPlaylistDetail(BuildContext context, String playlistId) {
     Navigator.push(
       context,
@@ -180,11 +206,13 @@ class _PlaylistGridItem extends StatelessWidget {
 }
 
 String _formatDuration(List<Map<String, dynamic>> songs) {
-  final totalSeconds = songs.fold<int>(
+  // Duration is stored in milliseconds, convert to seconds
+  final totalMs = songs.fold<int>(
     0,
     (prev, song) => prev + (song['duration'] as int? ?? 0),
   );
-
+  
+  final totalSeconds = (totalMs / 1000).round();
   final duration = Duration(seconds: totalSeconds);
   final hours = duration.inHours;
   final minutes = duration.inMinutes.remainder(60);
@@ -194,6 +222,129 @@ String _formatDuration(List<Map<String, dynamic>> songs) {
     return '$hours:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
   return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+}
+
+class _PlaylistListItem extends StatelessWidget {
+  final Playlist playlist;
+  final VoidCallback onTap;
+  final Future<void> Function()? onDelete;
+
+  const _PlaylistListItem({
+    required this.playlist,
+    required this.onTap,
+    this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cardWidget = Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 2,
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(12),
+        leading: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: SizedBox(
+            width: 60,
+            height: 60,
+            child: _PlaylistArtwork(playlist: playlist),
+          ),
+        ),
+        title: Text(
+          playlist.name,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+        ),
+        subtitle: Text(
+          '${playlist.songCount} songs, ${_formatDuration(playlist.songs)} total',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        trailing: Icon(
+          Icons.chevron_right,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+        onTap: onTap,
+      ),
+    );
+
+    if (onDelete == null) {
+      return cardWidget;
+    }
+
+    return Dismissible(
+      key: Key('playlist_${playlist.id}'),
+      direction: DismissDirection.endToStart,
+      movementDuration: const Duration(milliseconds: 200),
+      dismissThresholds: const {
+        DismissDirection.endToStart: 0.3,
+      },
+      background: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        color: Theme.of(context).colorScheme.error,
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 24),
+        child: const Icon(
+          Icons.delete_rounded,
+          color: Colors.white,
+          size: 32,
+        ),
+      ),
+      confirmDismiss: (direction) async {
+        return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: const Text('Delete Playlist'),
+            content: Text('Are you sure you want to delete "${playlist.name}"?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.error,
+                ),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+        );
+      },
+      onDismissed: (direction) async {
+        await onDelete!();
+      },
+      child: cardWidget,
+    );
+  }
+
+  String _formatDuration(List<Map<String, dynamic>> songs) {
+    // Duration is stored in milliseconds, convert to seconds
+    final totalMs = songs.fold<int>(
+      0,
+      (prev, song) => prev + (song['duration'] as int? ?? 0),
+    );
+    
+    final totalSeconds = (totalMs / 1000).round();
+    final duration = Duration(seconds: totalSeconds);
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+    final seconds = duration.inSeconds.remainder(60);
+
+    if (hours > 0) {
+      return '$hours:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    }
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
 }
 
 class _PlaylistArtwork extends StatelessWidget {

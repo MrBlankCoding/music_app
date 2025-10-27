@@ -7,10 +7,12 @@ class PlaylistProvider with ChangeNotifier {
 
   List<Playlist> _playlists = [];
   bool _isLoading = true;
+  bool _isGridView = true; // Default to grid view
 
   // Getters
   List<Playlist> get playlists => _playlists;
   bool get isLoading => _isLoading;
+  bool get isGridView => _isGridView;
 
   PlaylistProvider({PlaylistService? playlistService}) : _playlistService = playlistService ?? PlaylistService();
 
@@ -164,5 +166,10 @@ class PlaylistProvider with ChangeNotifier {
     } catch (e) {
       // Handle error
     }
+  }
+
+  void toggleView() {
+    _isGridView = !_isGridView;
+    notifyListeners();
   }
 }

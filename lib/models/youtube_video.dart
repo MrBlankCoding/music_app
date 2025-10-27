@@ -22,4 +22,19 @@ class YouTubeVideo {
       duration: json['duration'] ?? 'Unknown',
     );
   }
+  YouTubeVideo copyWith({
+    String? videoId,
+    String? title,
+    String? channelTitle,
+    String? thumbnailUrl,
+    String? duration,
+  }) {
+    return YouTubeVideo(
+      videoId: videoId ?? this.videoId,
+      title: title ?? this.title,
+      channelTitle: channelTitle ?? this.channelTitle,
+      thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
+      duration: duration ?? this.duration,
+    );
+  }
 }

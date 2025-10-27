@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/search_provider.dart';
 import '../widgets/search_bar_widget.dart';
 import '../widgets/music_card.dart';
+import 'package:html_unescape/html_unescape.dart';
 
 class MusicSearchScreen extends StatefulWidget {
   const MusicSearchScreen({super.key});
@@ -91,7 +92,13 @@ class _MusicSearchScreenState extends State<MusicSearchScreen> {
               : ListView.builder(
                   itemCount: searchProvider.videos.length,
                   itemBuilder: (context, index) {
-                    return MusicCard(video: searchProvider.videos[index]);
+                    final video = searchProvider.videos[index];
+                    final unescape = HtmlUnescape();
+                    // If video has a title or other fields with HTML entities, decode them here
+                    final parsedVideo = video.copyWith(
+                      title: unescape.convert(video.title),
+                    );
+                    return MusicCard(video: parsedVideo);
                   },
                 ),
         ),

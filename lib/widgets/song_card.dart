@@ -19,6 +19,7 @@ class SongCard extends StatelessWidget {
   final bool enableSwipeToDelete;
   final Future<void> Function()? onDelete;
   final String? deleteConfirmMessage;
+  final Future<void> Function()? onAddToQueue;
 
   const SongCard({
     super.key,
@@ -33,6 +34,7 @@ class SongCard extends StatelessWidget {
     this.enableSwipeToDelete = false,
     this.onDelete,
     this.deleteConfirmMessage,
+    this.onAddToQueue,
   });
 
   @override
@@ -259,68 +261,92 @@ class SongCard extends StatelessWidget {
       ),
     );
 
-    // Wrap with Dismissible if swipe-to-delete is enabled
-    if (enableSwipeToDelete && onDelete != null) {
+    // Wrap with Dismissible if swipe gestures are enabled
+    if (enableSwipeToDelete && (onDelete != null || onAddToQueue != null)) {
       return Dismissible(
         key: Key('song_dismiss_$songPath'),
-        direction: DismissDirection.endToStart,
+        direction: DismissDirection.horizontal,
+        movementDuration: const Duration(milliseconds: 200),
+        dismissThresholds: const {
+          DismissDirection.startToEnd: 0.3,
+          DismissDirection.endToStart: 0.3,
+        },
         background: Container(
+          color: Theme.of(context).colorScheme.error,
           alignment: Alignment.centerRight,
           padding: const EdgeInsets.only(right: 24),
-          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Theme.of(context).colorScheme.error.withOpacity(0.0),
-                Theme.of(context).colorScheme.error,
-              ],
-              stops: const [0.0, 0.7],
-            ),
-            borderRadius: BorderRadius.circular(16),
-          ),
           child: Icon(
             Icons.delete_rounded,
             color: Theme.of(context).colorScheme.onError,
             size: 32,
           ),
         ),
+        secondaryBackground: Container(
+          color: Theme.of(context).colorScheme.primary,
+          alignment: Alignment.centerLeft,
+          padding: const EdgeInsets.only(left: 24),
+          child: Icon(
+            Icons.queue_music,
+            color: Theme.of(context).colorScheme.onPrimary,
+            size: 32,
+          ),
+        ),
         confirmDismiss: (direction) async {
           HapticFeedback.mediumImpact();
-          return await showDialog<bool>(
-            context: context,
-            builder: (context) => AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              title: const Text('Delete Song'),
-              content: Text(
-                deleteConfirmMessage ??
-                    'Are you sure you want to delete this song?',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: Text(
-                    'Cancel',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+          
+          if (direction == DismissDirection.endToStart && onDelete != null) {
+            // Swipe LEFT - Delete
+            return await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                title: const Text('Delete Song'),
+                content: Text(
+                  deleteConfirmMessage ??
+                      'Are you sure you want to delete this song?',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: Text(
+                      'Cancel',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.error,
+                  FilledButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.error,
+                    ),
+                    child: const Text('Delete'),
                   ),
-                  child: const Text('Delete'),
+                ],
+              ),
+            );
+          } else if (direction == DismissDirection.startToEnd && onAddToQueue != null) {
+            // Swipe RIGHT - Add to queue
+            await onAddToQueue!();
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text('Added to queue'),
+                  duration: const Duration(seconds: 1),
+                  behavior: SnackBarBehavior.floating,
                 ),
-              ],
-            ),
-          );
+              );
+            }
+          }
+          return false;
         },
         onDismissed: (direction) async {
-          HapticFeedback.lightImpact();
-          await onDelete!();
+          if (direction == DismissDirection.endToStart && onDelete != null) {
+            HapticFeedback.lightImpact();
+            await onDelete!();
+          }
         },
         child: cardWidget,
       );

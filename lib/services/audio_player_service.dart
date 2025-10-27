@@ -145,7 +145,14 @@ class AudioPlayerService {
         : Uri.file(songData.path);
     final audioSource = AudioSource.uri(uri, tag: mediaItem);
 
-    final playlist = _audioPlayer.audioSource as ConcatenatingAudioSource;
+    ConcatenatingAudioSource playlist;
+    if (_audioPlayer.audioSource == null) {
+      playlist = ConcatenatingAudioSource(children: []);
+      await _audioPlayer.setAudioSource(playlist);
+    } else {
+      playlist = _audioPlayer.audioSource as ConcatenatingAudioSource;
+    }
+
     await playlist.add(audioSource);
 
     final currentPlaylist = _playlistSubject.value;

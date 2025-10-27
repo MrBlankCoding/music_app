@@ -62,11 +62,13 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
   }
 
   String _formatDuration(List<Map<String, dynamic>> songs) {
-    final totalSeconds = songs.fold<int>(
+    // Duration is stored in milliseconds, convert to seconds
+    final totalMs = songs.fold<int>(
       0,
       (prev, song) => prev + (song['duration'] as int? ?? 0),
     );
-
+    
+    final totalSeconds = (totalMs / 1000).round();
     final duration = Duration(seconds: totalSeconds);
     final hours = duration.inHours;
     final minutes = duration.inMinutes.remainder(60);
@@ -389,6 +391,9 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                   onDelete: () async {
                     await _removeSongFromPlaylist(context, songPath);
                   },
+                  onAddToQueue: () async {
+                    await musicPlayerProvider.addToQueue(song);
+                  },
                   onTap: () =>
                       _handleSongTap(musicPlayerProvider, song, songs, index),
                   onPlay: () =>
@@ -490,11 +495,18 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
         ),
         delegate: SliverChildBuilderDelegate((context, index) {
           final song = songs[index];
+          final songPath = song['path'] as String;
 
           return SongGridItem(
             song: song,
             onTap: () =>
                 _handleSongTap(musicPlayerProvider, song, songs, index),
+            onAddToQueue: () async {
+              await musicPlayerProvider.addToQueue(song);
+            },
+            onDelete: () async {
+              await _removeSongFromPlaylist(context, songPath);
+            },
           );
         }, childCount: songs.length),
       ),

@@ -11,7 +11,6 @@ import 'library_screen.dart';
 import 'download_queue_screen.dart';
 import 'queue_screen.dart';
 
-
 class HomeScreen extends StatefulWidget {
   final int initialIndex;
 
@@ -68,21 +67,33 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             Consumer<LibraryProvider>(
               builder: (context, libraryProvider, child) => IconButton(
-                icon: Icon(libraryProvider.isGridView ? Icons.list : Icons.grid_view),
+                icon: Icon(
+                  libraryProvider.isGridView ? Icons.list : Icons.grid_view,
+                ),
                 onPressed: () => libraryProvider.toggleView(),
                 tooltip: libraryProvider.isGridView ? 'List View' : 'Grid View',
               ),
             ),
           ],
 
-          // Show refresh button when on Playlists tab
-          if (_selectedIndex == 2)
+          // Show view toggle and refresh button when on Playlists tab
+          if (_selectedIndex == 2) ...[
+            Consumer<PlaylistProvider>(
+              builder: (context, playlistProvider, child) => IconButton(
+                icon: Icon(
+                  playlistProvider.isGridView ? Icons.list : Icons.grid_view,
+                ),
+                onPressed: () => playlistProvider.toggleView(),
+                tooltip: playlistProvider.isGridView ? 'List View' : 'Grid View',
+              ),
+            ),
             IconButton(
               icon: const Icon(Icons.refresh),
               onPressed: () => context.read<PlaylistProvider>().loadPlaylists(),
             ),
+          ],
 
-/*
+          /*
           if (_selectedIndex == 0) ...[
             IconButton(
               icon: const Icon(Icons.playlist_add),
@@ -90,7 +101,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
 */
-
           Selector<DownloadService, int>(
             selector: (_, service) => service.downloadQueue.length,
             builder: (context, queueLength, child) {

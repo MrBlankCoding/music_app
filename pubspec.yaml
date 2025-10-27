@@ -20,6 +20,7 @@ dependencies:
   flutter_media_metadata: ^1.0.0+1
 
   rxdart: any
+  html_unescape: ^2.0.0
 dev_dependencies:
   flutter_lints: ^6.0.0
   build_runner: ^2.10.1
