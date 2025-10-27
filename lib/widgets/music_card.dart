@@ -38,10 +38,35 @@ class _MusicCardState extends State<MusicCard> {
           width: 80,
           height: 60,
           color: Theme.of(context).colorScheme.surfaceContainerHigh,
-          child: Icon(
-            Icons.music_note,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
+          child: widget.video.thumbnailUrl.isNotEmpty
+              ? Image.network(
+                  widget.video.thumbnailUrl,
+                  width: 80,
+                  height: 60,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Icon(
+                      Icons.music_note,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    );
+                  },
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Center(
+                      child: CircularProgressIndicator(
+                        value: loadingProgress.expectedTotalBytes != null
+                            ? loadingProgress.cumulativeBytesLoaded /
+                                loadingProgress.expectedTotalBytes!
+                            : null,
+                        strokeWidth: 2,
+                      ),
+                    );
+                  },
+                )
+              : Icon(
+                  Icons.music_note,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
         ),
       ),
       title: Text(
