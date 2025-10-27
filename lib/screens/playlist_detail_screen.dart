@@ -49,8 +49,10 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
 
     // Recompute and cache
     final songManagementService = SongManagementService(context);
-    final reconciled = songManagementService.getReconciledPlaylistSongs(playlist);
-    
+    final reconciled = songManagementService.getReconciledPlaylistSongs(
+      playlist,
+    );
+
     _cachedSongs = reconciled;
     _cachedPlaylistId = playlist.id;
     _cachedPlaylistSongsHash = playlistHash;
@@ -89,7 +91,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
       await musicPlayerProvider.stop();
     }
     await playlistProvider.removeSongFromPlaylist(widget.playlistId, songPath);
-    
+
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -118,10 +120,9 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
     Playlist playlist,
     LibraryProvider libraryProvider,
   ) {
-    final albumArts = PlaylistArtworkHelper.getAlbumArts(
-      playlist,
-      libraryProvider.songs,
-    );
+    // Use reconciled songs for accurate meta data
+    final songs = _getReconciledSongs(playlist, libraryProvider.songs);
+    final albumArts = PlaylistArtworkHelper.getAlbumArts(playlist, songs);
 
     const double size = 200;
 
@@ -276,7 +277,8 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.edit),
-            onPressed: () => PlaylistDialogs.showEditPlaylistDialog(context, playlist),
+            onPressed: () =>
+                PlaylistDialogs.showEditPlaylistDialog(context, playlist),
           ),
         ],
       ),
@@ -289,7 +291,11 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                 Center(
                   child: Hero(
                     tag: 'playlist_${playlist.id}',
-                    child: _buildPlaylistArtwork(context, playlist, libraryProvider),
+                    child: _buildPlaylistArtwork(
+                      context,
+                      playlist,
+                      libraryProvider,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -297,8 +303,8 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                 Text(
                   playlist.name,
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                    fontWeight: FontWeight.bold,
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
@@ -309,7 +315,10 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                 const SizedBox(height: 16),
                 // Action buttons
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16.0,
+                    vertical: 8.0,
+                  ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
@@ -376,23 +385,14 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                   showDragHandle: true,
                   reorderIndex: index,
                   enableSwipeToDelete: true,
-                  deleteConfirmMessage:
-                      'Remove this song from the playlist?',
+                  deleteConfirmMessage: 'Remove this song from the playlist?',
                   onDelete: () async {
                     await _removeSongFromPlaylist(context, songPath);
                   },
-                  onTap: () => _handleSongTap(
-                    musicPlayerProvider,
-                    song,
-                    songs,
-                    index,
-                  ),
-                  onPlay: () => _handleSongTap(
-                    musicPlayerProvider,
-                    song,
-                    songs,
-                    index,
-                  ),
+                  onTap: () =>
+                      _handleSongTap(musicPlayerProvider, song, songs, index),
+                  onPlay: () =>
+                      _handleSongTap(musicPlayerProvider, song, songs, index),
                   menuItems: [
                     PopupMenuItem<String>(
                       value: 'remove',
@@ -425,7 +425,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                   oldIndex,
                   newIndex,
                 );
-                
+
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Playlist reordered'),
@@ -475,8 +475,10 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
     );
   }
 
-  Widget _buildSliverGrid(List<Map<String, dynamic>> songs, 
-                     MusicPlayerProvider musicPlayerProvider) {
+  Widget _buildSliverGrid(
+    List<Map<String, dynamic>> songs,
+    MusicPlayerProvider musicPlayerProvider,
+  ) {
     return SliverPadding(
       padding: const EdgeInsets.all(12),
       sliver: SliverGrid(
@@ -486,22 +488,15 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
         ),
-        delegate: SliverChildBuilderDelegate(
-          (context, index) {
-            final song = songs[index];
-            
-            return SongGridItem(
-              song: song,
-              onTap: () => _handleSongTap(
-                musicPlayerProvider,
-                song,
-                songs,
-                index,
-              ),
-            );
-          },
-          childCount: songs.length,
-        ),
+        delegate: SliverChildBuilderDelegate((context, index) {
+          final song = songs[index];
+
+          return SongGridItem(
+            song: song,
+            onTap: () =>
+                _handleSongTap(musicPlayerProvider, song, songs, index),
+          );
+        }, childCount: songs.length),
       ),
     );
   }

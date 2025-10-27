@@ -166,6 +166,9 @@ class PlaylistService {
     for (var song in playlist.songs.take(4)) {
       final songData = SongData(song);
       final storedPath = songData.path;
+      
+      // Skip if path is empty
+      if (storedPath.isEmpty) continue;
 
       final filename = storedPath.split('/').last;
       final librarySong = librarySongs.firstWhere(
@@ -173,7 +176,7 @@ class PlaylistService {
         orElse: () => <String, dynamic>{},
       );
 
-      final albumArt = librarySong.isNotEmpty
+      final albumArt = (librarySong.isNotEmpty && librarySong['path'] != null)
           ? SongData(librarySong).albumArt
           : songData.albumArt;
 

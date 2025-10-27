@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import '../models/playlist.dart';
+import 'song_data_helper.dart';
 
 class PlaylistArtworkHelper {
   /// Get album arts from songs in the playlist
@@ -24,9 +25,12 @@ class PlaylistArtworkHelper {
         orElse: () => <String, dynamic>{},
       );
 
-      // Get album art from the song
-      final albumArt = matchingSong['albumArt'] as Uint8List?;
-      
+      // Skip if song is empty (path is missing)
+      if (matchingSong.isEmpty || matchingSong['path'] == null) continue;
+
+      // Use SongData helper to get album art as Uint8List
+      final albumArt = SongData(matchingSong).albumArt;
+
       // Only add if it exists and we haven't seen it before
       if (albumArt != null && !seenPaths.contains(songPath)) {
         albumArts.add(albumArt);

@@ -1,30 +1,26 @@
 import 'dart:typed_data';
+import '../models/song_metadata.dart';
 
+/// Compatibility wrapper around Map to provide SongMetadata-like interface
+/// 
+/// This class is maintained for backward compatibility.
+/// New code should use SongMetadata directly.
 class SongData {
-  final Map<String, dynamic> _songData;
+  final SongMetadata _metadata;
 
-  SongData(this._songData);
+  SongData(Map<String, dynamic> songData) : _metadata = SongMetadata.fromMap(songData);
 
-  Uint8List? get albumArt {
-    return _songData['albumArt'] as Uint8List? ??
-        _songData['album_art'] as Uint8List?;
-  }
+  /// Returns album art as Uint8List, or null if unavailable
+  Uint8List? get albumArt => _metadata.albumArt;
 
-  String get title {
-    return _songData['title'] as String? ??
-        _songData['name'] as String? ??
-        'Unknown Title';
-  }
-
-  String get artist {
-    return _songData['artist'] as String? ?? 'Unknown Artist';
-  }
-
-  String get path {
-    return _songData['path'] as String;
-  }
-
-  String get id {
-    return _songData['id']?.toString() ?? path;
-  }
+  String get title => _metadata.title;
+  String get artist => _metadata.artist;
+  String get album => _metadata.album;
+  String get genre => _metadata.genre ?? 'Unknown Genre';
+  int? get duration => _metadata.duration;
+  int? get year => _metadata.year;
+  String get path => _metadata.localPath;
+  String get videoId => _metadata.videoId ?? '';
+  String get id => _metadata.id;
+  String get name => _metadata.name;
 }

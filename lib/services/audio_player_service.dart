@@ -92,6 +92,14 @@ class AudioPlayerService {
   }) async {
     if (songs.isEmpty) return;
 
+    // Debug print meta data for all songs in queue
+    for (var i = 0; i < songs.length; i++) {
+      final songData = SongData(songs[i]);
+      print(
+        '[DEBUG] Song $i: title="${songData.title}", artist="${songData.artist}", album="${songData.album}", path="${songData.path}", hasArt=${songData.albumArt != null}',
+      );
+    }
+
     _playlistSubject.add(songs);
 
     final playlist = ConcatenatingAudioSource(

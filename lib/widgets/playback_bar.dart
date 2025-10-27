@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:just_audio/just_audio.dart';
@@ -307,7 +308,7 @@ class _PlaybackBarState extends State<PlaybackBar>
     );
   }
 
-Widget _buildAlbumArt(
+  Widget _buildAlbumArt(
     ThemeData theme,
     SongData songData,
     MusicPlayerProvider provider,
@@ -316,7 +317,26 @@ Widget _buildAlbumArt(
       stream: provider.sequenceStateStream,
       builder: (context, snapshot) {
         final mediaItem = snapshot.data?.currentSource?.tag as MediaItem?;
-        final artBytes = mediaItem?.extras?['albumArt'] as Uint8List?;
+        final art = mediaItem?.extras?['albumArt'];
+        Uint8List? artBytes;
+        if (art is Uint8List) {
+          artBytes = art;
+        } else if (art is List<int>) {
+          artBytes = Uint8List.fromList(art);
+        } else if (art is String) {
+          try {
+            if (art.startsWith('data:')) {
+              final comma = art.indexOf(',');
+              if (comma != -1 && comma + 1 < art.length) {
+                artBytes = base64Decode(art.substring(comma + 1));
+              }
+            } else {
+              artBytes = base64Decode(art);
+            }
+          } catch (_) {
+            artBytes = null;
+          }
+        }
 
         return ClipRRect(
           borderRadius: BorderRadius.circular(8),

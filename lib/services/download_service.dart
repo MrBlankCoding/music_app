@@ -1,15 +1,14 @@
 import 'dart:collection';
 import 'dart:io';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
-import 'package:flutter_media_metadata/flutter_media_metadata.dart';
-import '../models/youtube_video.dart';
 import 'package:oktoast/oktoast.dart';
+import '../models/youtube_video.dart';
+import '../models/song_metadata.dart';
 import '../providers/library_provider.dart';
-import '../utils/metadata_utils.dart';
+import '../utils/song_utils.dart';
 
 class DownloadService with ChangeNotifier {
   static final DownloadService _instance = DownloadService._internal();
@@ -18,11 +17,6 @@ class DownloadService with ChangeNotifier {
 
   LibraryProvider? _libraryProvider;
   bool isQueueScreenVisible = false;
-
-  void setLibraryProvider(LibraryProvider libraryProvider) {
-    _libraryProvider = libraryProvider;
-  }
-
   String? _downloadDirectory;
   final String _serverUrl = 'http://127.0.0.1:8000';
   final Queue<YouTubeVideo> _downloadQueue = Queue<YouTubeVideo>();
@@ -31,9 +25,11 @@ class DownloadService with ChangeNotifier {
   Queue<YouTubeVideo> get downloadQueue => _downloadQueue;
   bool get isDownloading => _isDownloading;
   String? get currentlyDownloadingVideoId =>
-      _isDownloading && _downloadQueue.isNotEmpty
-      ? _downloadQueue.first.videoId
-      : null;
+      _isDownloading && _downloadQueue.isNotEmpty ? _downloadQueue.first.videoId : null;
+
+  void setLibraryProvider(LibraryProvider libraryProvider) {
+    _libraryProvider = libraryProvider;
+  }
 
   Future<void> initialize() async {
     final appDocDir = await getApplicationDocumentsDirectory();
@@ -42,9 +38,7 @@ class DownloadService with ChangeNotifier {
   }
 
   void addToQueue(YouTubeVideo video) {
-    if (_downloadQueue.any((v) => v.videoId == video.videoId)) {
-      return;
-    }
+    if (_downloadQueue.any((v) => v.videoId == video.videoId)) return;
     _downloadQueue.add(video);
     notifyListeners();
     _processQueue();
@@ -57,84 +51,47 @@ class DownloadService with ChangeNotifier {
     final video = _downloadQueue.first;
 
     try {
-      // Make GET request to download endpoint
-      final response = await http.get(
-        Uri.parse('$_serverUrl/download/${video.videoId}'),
-      );
+      final response = await http.get(Uri.parse('$_serverUrl/download/${video.videoId}'));
+      if (response.statusCode != 200) throw Exception('Download failed');
 
-      if (response.statusCode == 200) {
-        // Save the audio file
-        final sanitizedTitle = _sanitizeFilename(video.title);
-        final filePath = '$_downloadDirectory/$sanitizedTitle.mp3';
-        final file = File(filePath);
-        await file.writeAsBytes(response.bodyBytes);
-        print('Downloaded song path: $filePath');
+      final sanitizedTitle = _sanitizeFilename(video.title);
+      final filePath = '$_downloadDirectory/$sanitizedTitle.mp3';
+      final file = File(filePath);
+      await file.writeAsBytes(response.bodyBytes);
 
-        // Extract metadata including album art from the downloaded MP3
-        Uint8List? albumArtBytes;
-        try {
-          print('DownloadService: Attempting to extract metadata from file: ${file.path}');
-          final mp3Metadata = await MetadataRetriever.fromFile(file);
-          albumArtBytes = mp3Metadata.albumArt;
-          print('DownloadService: Album art extracted: ${albumArtBytes != null ? '${albumArtBytes.length} bytes' : 'null'}');
-
-          // Log all available metadata properties
-          print('DownloadService: Metadata extracted successfully, albumArt present: ${mp3Metadata.albumArt != null}');
-        } catch (e) {
-          print('DownloadService: Error extracting album art during download for ${video.title}: $e');
-        }
-
-        // Save metadata as JSON including album art if available
-        final metadata = {
-          'title': video.title,
-          'channel': video.channelTitle,
-          'artist': video.channelTitle,
-          'video_id': video.videoId,
-          'albumArt': albumArtBytes != null
-              ? base64Encode(albumArtBytes)
-              : null,
-        };
-        final metadataPath = '$_downloadDirectory/$sanitizedTitle.json';
-        final metadataFile = File(metadataPath);
-        await metadataFile.writeAsString(json.encode(metadata));
-
-        print('DownloadService: Successfully downloaded: ${video.title} to $filePath');
-
-        _downloadQueue.removeFirst();
-
-        if (!isQueueScreenVisible) {
-          showToast(
-            "✓ Downloaded: ${video.title}",
-            position: const ToastPosition(
-              align: Alignment.bottomCenter,
-              offset: -72.0,
-            ),
-            duration: const Duration(seconds: 3),
-          );
-        }
-
-        _libraryProvider?.loadSongs();
-      } else {
-        throw Exception(
-          'Failed to download: ${response.statusCode} - ${response.body}',
+      // Extract metadata using SongUtils
+      SongMetadata songMetadata;
+      try {
+        songMetadata = await SongUtils.extractMetadata(filePath);
+        // Update video ID
+        songMetadata = songMetadata.copyWith(videoId: video.videoId);
+      } catch (e) {
+        print('Metadata extraction failed: $e');
+        // Create metadata from video info
+        songMetadata = SongMetadata(
+          title: video.title,
+          artist: 'Unknown Artist',
+          album: 'Unknown Album',
+          localPath: filePath,
+          videoId: video.videoId,
         );
       }
-    } catch (e, s) {
-      print('DownloadService: Download failed for ${video.title}');
-      print('Error: $e');
-      print('Stack trace: $s');
+
+      // Save metadata JSON
+      final metadataPath = '$_downloadDirectory/$sanitizedTitle.json';
+      final metadataMap = SongUtils.toStorageMap(songMetadata);
+      await File(metadataPath).writeAsString(json.encode(metadataMap));
+
       _downloadQueue.removeFirst();
-
       if (!isQueueScreenVisible) {
-        showToast(
-          "✗ Download failed: ${video.title}",
-          position: const ToastPosition(
-            align: Alignment.bottomCenter,
-            offset: -72.0,
-          ),
-          duration: const Duration(seconds: 3),
-        );
+        showToast("✓ Downloaded: ${songMetadata.title}", duration: const Duration(seconds: 3));
       }
+
+      _libraryProvider?.loadSongs();
+    } catch (e) {
+      print('Download failed: $e');
+      _downloadQueue.removeFirst();
+      if (!isQueueScreenVisible) showToast("✗ Download failed: ${video.title}", duration: const Duration(seconds: 3));
     } finally {
       _isDownloading = false;
       notifyListeners();
@@ -143,127 +100,64 @@ class DownloadService with ChangeNotifier {
   }
 
   String _sanitizeFilename(String filename) {
-    // Remove or replace invalid filename characters
-    return filename
-        .replaceAll(RegExp(r'[<>:"/\\|?*]'), '')
-        .replaceAll(RegExp(r'\s+'), '_')
-        .trim();
+    return SongUtils.sanitizeFilename(filename);
   }
 
   Future<List<Map<String, dynamic>>> getDownloadedSongs() async {
     if (_downloadDirectory == null) await initialize();
-
     final dir = Directory(_downloadDirectory!);
     if (!await dir.exists()) return [];
 
-    final files = await dir
-        .list()
-        .where((e) => e is File && e.path.endsWith('.mp3'))
-        .cast<File>()
-        .toList();
+    final files = await dir.list().where((f) => f is File && f.path.endsWith('.mp3')).cast<File>().toList();
 
-    final songs = await Future.wait(
-      files.map((file) async {
-        final stat = await file.stat();
-        final baseName = file.path.replaceAll('.mp3', '');
-        final metadataPath = '$baseName.json';
-
-        // Load metadata if exists
-        Map<String, dynamic>? metadata;
-        try {
-          final metadataFile = File(metadataPath);
-          if (await metadataFile.exists()) {
-            final metadataContent = await metadataFile.readAsString();
-            metadata = json.decode(metadataContent);
-          }
-        } catch (e) {
-          print('DownloadService: Error loading metadata for ${file.path}: $e');
+    return Future.wait(files.map((file) async {
+      final stat = await file.stat();
+      final baseName = file.path.replaceAll('.mp3', '');
+      Map<String, dynamic>? storedMetadata;
+      try {
+        final metadataFile = File('$baseName.json');
+        if (await metadataFile.exists()) {
+          storedMetadata = json.decode(await metadataFile.readAsString());
         }
+      } catch (_) {}
 
-        // Try to get album art from metadata first, then from MP3 file if not found
-        Uint8List? albumArtBytes;
-        if (metadata?['albumArt'] != null) {
-          try {
-            print('DownloadService: Found albumArt in metadata for ${file.path}');
-            albumArtBytes = base64Decode(metadata!['albumArt']);
-            print('DownloadService: Successfully decoded albumArt from metadata: ${albumArtBytes.length} bytes');
-          } catch (e) {
-            print('DownloadService: Error decoding album art from metadata for ${file.path}: $e');
-          }
-        } else {
-          print('DownloadService: No albumArt found in metadata for ${file.path}');
-        }
-
-        // If no album art in metadata, try extracting from MP3 file
-        if (albumArtBytes == null) {
-          try {
-            print('DownloadService: Attempting to extract album art from MP3 file: ${file.path}');
-            final mp3Metadata = await MetadataRetriever.fromFile(file);
-            albumArtBytes = mp3Metadata.albumArt;
-            print('DownloadService: MP3 metadata extraction result: albumArt ${albumArtBytes != null ? '${albumArtBytes.length} bytes found' : 'not found'}');
-          } catch (e) {
-            print('DownloadService: Error extracting album art from ${file.path}: $e');
-          }
-        }
-
-        // Derive display name from filename
-        String fileDisplayName = file.path
-            .split('/')
-            .last
-            .replaceAll('.mp3', '')
-            .replaceAll('_', ' ');
-        fileDisplayName = MetadataUtils.decodeHtmlEntities(
-          fileDisplayName,
-        ).trim();
-
-        // Prefer artist from metadata; fallback to channel
-        String? artist = (metadata?['artist'] as String?)?.trim();
-        artist ??= (metadata?['channel'] as String?)?.trim();
-
-        // Prefer title from metadata
-        String? title = (metadata?['title'] as String?)?.trim();
-
-        // Decode HTML entities from metadata values
-        if (artist != null) {
-          artist = MetadataUtils.decodeHtmlEntities(artist).trim();
-        }
-        if (title != null) {
-          title = MetadataUtils.decodeHtmlEntities(title).trim();
-        }
-
-        // If artist missing, try to parse from filename pattern: "Artist - Title"
-        final parsed = MetadataUtils.extractArtistTitle(fileDisplayName);
-        if ((artist == null || artist.isEmpty) && parsed.artist != null) {
-          artist = parsed.artist;
-        }
-
-        // Decide on title
-        final baseTitle = (title != null && title.isNotEmpty)
-            ? title
-            : (parsed.title ?? fileDisplayName);
-        final effectiveTitle = MetadataUtils.cleanTitle(
-          MetadataUtils.normalizeWhitespace(baseTitle),
-        );
-        final effectiveName = effectiveTitle;
-
-        return {
+      // Use stored metadata or extract from file
+      SongMetadata songMetadata;
+      if (storedMetadata != null) {
+        songMetadata = SongMetadata.fromMap({
           'path': file.path,
-          'name': effectiveName,
-          'size': stat.size,
-          'modified': stat.modified,
-          'albumArt': albumArtBytes,
-          'artist': artist,
-          'title': effectiveTitle,
-          'video_id': metadata?['video_id'],
-        };
-      }),
-    );
+          'title': storedMetadata['title'],
+          'name': storedMetadata['name'] ?? storedMetadata['title'],
+          'artist': storedMetadata['artist'],
+          'album': storedMetadata['album'],
+          'genre': storedMetadata['genre'],
+          'duration': storedMetadata['duration'],
+          'year': storedMetadata['year'],
+          'albumArt': storedMetadata['albumArt'],
+          'video_id': storedMetadata['video_id'],
+        });
+      } else {
+        // Try to extract metadata from the file
+        try {
+          songMetadata = await SongUtils.extractMetadata(file.path);
+        } catch (e) {
+          // Fallback to filename
+          final filename = file.path.split('/').last.replaceAll('.mp3', '');
+          songMetadata = SongMetadata(
+            title: filename,
+            artist: 'Unknown Artist',
+            album: 'Unknown Album',
+            localPath: file.path,
+          );
+        }
+      }
 
-    songs.sort(
-      (a, b) =>
-          (b['modified'] as DateTime).compareTo(a['modified'] as DateTime),
-    );
-    return songs;
+      final metadataMap = songMetadata.toMap();
+      metadataMap['modified'] = stat.modified;
+      metadataMap['size'] = stat.size;
+
+      return metadataMap;
+    }).toList());
   }
 
   void cancelDownload(YouTubeVideo video) {
@@ -277,10 +171,7 @@ class DownloadService with ChangeNotifier {
     final file = File(path);
     if (await file.exists()) await file.delete();
 
-    // Delete associated metadata file
-    final baseName = path.replaceAll('.mp3', '');
-    final metadataPath = '$baseName.json';
-    final metadataFile = File(metadataPath);
+    final metadataFile = File(path.replaceAll('.mp3', '.json'));
     if (await metadataFile.exists()) await metadataFile.delete();
   }
 
