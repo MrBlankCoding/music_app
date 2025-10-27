@@ -18,14 +18,17 @@ class DownloadService with ChangeNotifier {
   LibraryProvider? _libraryProvider;
   bool isQueueScreenVisible = false;
   String? _downloadDirectory;
-  final String _serverUrl = 'https://lasandra-sultriest-bumblingly.ngrok-free.dev';
+  final String _serverUrl =
+      'https://lasandra-sultriest-bumblingly.ngrok-free.dev';
   final Queue<YouTubeVideo> _downloadQueue = Queue<YouTubeVideo>();
   bool _isDownloading = false;
 
   Queue<YouTubeVideo> get downloadQueue => _downloadQueue;
   bool get isDownloading => _isDownloading;
   String? get currentlyDownloadingVideoId =>
-      _isDownloading && _downloadQueue.isNotEmpty ? _downloadQueue.first.videoId : null;
+      _isDownloading && _downloadQueue.isNotEmpty
+      ? _downloadQueue.first.videoId
+      : null;
 
   void setLibraryProvider(LibraryProvider libraryProvider) {
     _libraryProvider = libraryProvider;
@@ -51,7 +54,9 @@ class DownloadService with ChangeNotifier {
     final video = _downloadQueue.first;
 
     try {
-      final response = await http.get(Uri.parse('$_serverUrl/download/${video.videoId}'));
+      final response = await http.get(
+        Uri.parse('$_serverUrl/download/${video.videoId}'),
+      );
       if (response.statusCode != 200) throw Exception('Download failed');
 
       final sanitizedTitle = _sanitizeFilename(video.title);
@@ -84,14 +89,22 @@ class DownloadService with ChangeNotifier {
 
       _downloadQueue.removeFirst();
       if (!isQueueScreenVisible) {
-        showToast("✓ Downloaded: ${songMetadata.title}", duration: const Duration(seconds: 3));
+        showToast(
+          "✓ Downloaded: ${songMetadata.title}",
+          duration: const Duration(seconds: 3),
+        );
       }
 
       _libraryProvider?.loadSongs();
     } catch (e) {
       print('Download failed: $e');
       _downloadQueue.removeFirst();
-      if (!isQueueScreenVisible) showToast("✗ Download failed: ${video.title}", duration: const Duration(seconds: 3));
+      if (!isQueueScreenVisible) {
+        showToast(
+          "✗ Download failed: ${video.title}",
+          duration: const Duration(seconds: 3),
+        );
+      }
     } finally {
       _isDownloading = false;
       notifyListeners();
@@ -108,56 +121,62 @@ class DownloadService with ChangeNotifier {
     final dir = Directory(_downloadDirectory!);
     if (!await dir.exists()) return [];
 
-    final files = await dir.list().where((f) => f is File && f.path.endsWith('.mp3')).cast<File>().toList();
+    final files = await dir
+        .list()
+        .where((f) => f is File && f.path.endsWith('.mp3'))
+        .cast<File>()
+        .toList();
 
-    return Future.wait(files.map((file) async {
-      final stat = await file.stat();
-      final baseName = file.path.replaceAll('.mp3', '');
-      Map<String, dynamic>? storedMetadata;
-      try {
-        final metadataFile = File('$baseName.json');
-        if (await metadataFile.exists()) {
-          storedMetadata = json.decode(await metadataFile.readAsString());
-        }
-      } catch (_) {}
-
-      // Use stored metadata or extract from file
-      SongMetadata songMetadata;
-      if (storedMetadata != null) {
-        songMetadata = SongMetadata.fromMap({
-          'path': file.path,
-          'title': storedMetadata['title'],
-          'name': storedMetadata['name'] ?? storedMetadata['title'],
-          'artist': storedMetadata['artist'],
-          'album': storedMetadata['album'],
-          'genre': storedMetadata['genre'],
-          'duration': storedMetadata['duration'],
-          'year': storedMetadata['year'],
-          'albumArt': storedMetadata['albumArt'],
-          'video_id': storedMetadata['video_id'],
-        });
-      } else {
-        // Try to extract metadata from the file
+    return Future.wait(
+      files.map((file) async {
+        final stat = await file.stat();
+        final baseName = file.path.replaceAll('.mp3', '');
+        Map<String, dynamic>? storedMetadata;
         try {
-          songMetadata = await SongUtils.extractMetadata(file.path);
-        } catch (e) {
-          // Fallback to filename
-          final filename = file.path.split('/').last.replaceAll('.mp3', '');
-          songMetadata = SongMetadata(
-            title: filename,
-            artist: 'Unknown Artist',
-            album: 'Unknown Album',
-            localPath: file.path,
-          );
+          final metadataFile = File('$baseName.json');
+          if (await metadataFile.exists()) {
+            storedMetadata = json.decode(await metadataFile.readAsString());
+          }
+        } catch (_) {}
+
+        // Use stored metadata or extract from file
+        SongMetadata songMetadata;
+        if (storedMetadata != null) {
+          songMetadata = SongMetadata.fromMap({
+            'path': file.path,
+            'title': storedMetadata['title'],
+            'name': storedMetadata['name'] ?? storedMetadata['title'],
+            'artist': storedMetadata['artist'],
+            'album': storedMetadata['album'],
+            'genre': storedMetadata['genre'],
+            'duration': storedMetadata['duration'],
+            'year': storedMetadata['year'],
+            'albumArt': storedMetadata['albumArt'],
+            'video_id': storedMetadata['video_id'],
+          });
+        } else {
+          // Try to extract metadata from the file
+          try {
+            songMetadata = await SongUtils.extractMetadata(file.path);
+          } catch (e) {
+            // Fallback to filename
+            final filename = file.path.split('/').last.replaceAll('.mp3', '');
+            songMetadata = SongMetadata(
+              title: filename,
+              artist: 'Unknown Artist',
+              album: 'Unknown Album',
+              localPath: file.path,
+            );
+          }
         }
-      }
 
-      final metadataMap = songMetadata.toMap();
-      metadataMap['modified'] = stat.modified;
-      metadataMap['size'] = stat.size;
+        final metadataMap = songMetadata.toMap();
+        metadataMap['modified'] = stat.modified;
+        metadataMap['size'] = stat.size;
 
-      return metadataMap;
-    }).toList());
+        return metadataMap;
+      }).toList(),
+    );
   }
 
   void cancelDownload(YouTubeVideo video) {

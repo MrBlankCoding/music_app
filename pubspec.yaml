@@ -22,6 +22,7 @@ dependencies:
   rxdart: any
   html_unescape: ^2.0.0
   audio_video_progress_bar: ^2.0.3
+  image: ^4.1.7
 dev_dependencies:
   flutter_lints: ^6.0.0
   build_runner: ^2.10.1
