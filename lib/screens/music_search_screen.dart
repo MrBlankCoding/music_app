@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/search_provider.dart';
 import '../widgets/search_bar_widget.dart';
 import '../widgets/music_card.dart';
+import '../widgets/playlist_card.dart';
 import 'package:html_unescape/html_unescape.dart';
 
 class MusicSearchScreen extends StatefulWidget {
@@ -14,6 +15,7 @@ class MusicSearchScreen extends StatefulWidget {
 
 class _MusicSearchScreenState extends State<MusicSearchScreen> {
   final TextEditingController _searchController = TextEditingController();
+  bool _isPlaylistSearch = false;
 
   @override
   void initState() {
@@ -31,34 +33,73 @@ class _MusicSearchScreenState extends State<MusicSearchScreen> {
     super.dispose();
   }
 
+  void _performSearch(String query) {
+    if (query.trim().isNotEmpty) {
+      final searchProvider = Provider.of<SearchProvider>(
+        context,
+        listen: false,
+      );
+      if (_isPlaylistSearch) {
+        searchProvider.searchPlaylists(query);
+      } else {
+        searchProvider.search(query);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final searchProvider = context.watch<SearchProvider>();
 
     return Column(
       children: [
-        SearchBarWidget(
-          controller: _searchController,
-          hintText: 'Search music...',
-          onChanged: (query) {
-            if (query.trim().isEmpty) {
-              searchProvider.clearSearch();
-            }
-          },
-          onSubmitted: (query) {
-            if (query.trim().isNotEmpty) {
-              searchProvider.search(query);
-            }
-          },
-          suffixIcon: _searchController.text.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.clear),
-                  onPressed: () {
+        Row(
+          children: [
+            Expanded(
+              child: SearchBarWidget(
+                controller: _searchController,
+                hintText: _isPlaylistSearch
+                    ? 'Search playlists...'
+                    : 'Search music...',
+                onChanged: (query) {
+                  if (query.trim().isEmpty) {
+                    searchProvider.clearSearch();
+                  }
+                },
+                onSubmitted: (query) {
+                  _performSearch(query);
+                },
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          searchProvider.clearSearch();
+                        },
+                      )
+                    : null,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(left: 8.0),
+              child: IconButton(
+                icon: Icon(
+                  _isPlaylistSearch ? Icons.playlist_play : Icons.music_note,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _isPlaylistSearch = !_isPlaylistSearch;
+                    searchProvider.setPlaylistSearch(_isPlaylistSearch);
                     _searchController.clear();
                     searchProvider.clearSearch();
-                  },
-                )
-              : null,
+                  });
+                },
+                tooltip: _isPlaylistSearch
+                    ? 'Switch to song search'
+                    : 'Switch to playlist search',
+              ),
+            ),
+          ],
         ),
         Expanded(
           child: searchProvider.isLoading
@@ -81,28 +122,49 @@ class _MusicSearchScreenState extends State<MusicSearchScreen> {
                         title: Text(q),
                         onTap: () {
                           _searchController.text = q;
-                          searchProvider.search(q);
+                          _performSearch(q);
                         },
                       ),
                     ),
                   ],
                 )
-              : searchProvider.videos.isEmpty
-              ? const Center(child: Text('No results'))
-              : ListView.builder(
-                  itemCount: searchProvider.videos.length,
-                  itemBuilder: (context, index) {
-                    final video = searchProvider.videos[index];
-                    final unescape = HtmlUnescape();
-                    // If video has a title or other fields with HTML entities, decode them here
-                    final parsedVideo = video.copyWith(
-                      title: unescape.convert(video.title),
-                    );
-                    return MusicCard(video: parsedVideo);
-                  },
-                ),
+              : _isPlaylistSearch
+              ? _buildPlaylistResults(searchProvider)
+              : _buildVideoResults(searchProvider),
         ),
       ],
+    );
+  }
+
+  Widget _buildVideoResults(SearchProvider searchProvider) {
+    if (searchProvider.videos.isEmpty) {
+      return const Center(child: Text('No results'));
+    }
+
+    return ListView.builder(
+      itemCount: searchProvider.videos.length,
+      itemBuilder: (context, index) {
+        final video = searchProvider.videos[index];
+        final unescape = HtmlUnescape();
+        final parsedVideo = video.copyWith(
+          title: unescape.convert(video.title),
+        );
+        return MusicCard(video: parsedVideo);
+      },
+    );
+  }
+
+  Widget _buildPlaylistResults(SearchProvider searchProvider) {
+    if (searchProvider.playlists.isEmpty) {
+      return const Center(child: Text('No playlists found'));
+    }
+
+    return ListView.builder(
+      itemCount: searchProvider.playlists.length,
+      itemBuilder: (context, index) {
+        final playlist = searchProvider.playlists[index];
+        return PlaylistCard(playlist: playlist);
+      },
     );
   }
 }
