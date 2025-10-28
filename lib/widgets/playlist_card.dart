@@ -38,18 +38,18 @@ class _PlaylistCardState extends State<PlaylistCard> {
 
       if (response.statusCode == 200) {
         showToast(
-          "✓ Playlist download started!",
+          "Playlist download started",
           duration: const Duration(seconds: 3),
         );
       } else {
         showToast(
-          "✗ Failed to start download",
+          "Failed to start download",
           duration: const Duration(seconds: 3),
         );
       }
     } catch (e) {
       showToast(
-        "✗ Error: ${e.toString()}",
+        "Error: ${e.toString()}",
         duration: const Duration(seconds: 3),
       );
     } finally {

@@ -8,6 +8,7 @@ import 'providers/library_provider.dart';
 import 'providers/playlist_provider.dart';
 import 'providers/search_provider.dart';
 import 'services/download_service.dart';
+import 'services/websocket_service.dart';
 import 'theme.dart';
 
 import 'screens/home_screen.dart';
@@ -38,6 +39,7 @@ Future<void> main() async {
           update: (_, libraryProvider, downloadService) =>
               downloadService!..setLibraryProvider(libraryProvider),
         ),
+        ChangeNotifierProvider(create: (_) => WebSocketService()),
       ],
       child: const MusicSearchApp(),
     ),

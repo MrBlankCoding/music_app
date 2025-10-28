@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/library_provider.dart';
 import '../providers/playlist_provider.dart';
 import '../services/download_service.dart';
+import '../services/websocket_service.dart';
 import '../widgets/playback_bar.dart';
 
 import 'music_search_screen.dart';
@@ -32,8 +33,20 @@ class _HomeScreenState extends State<HomeScreen> {
     // Kick off initial data loads after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      context.read<LibraryProvider>().loadSongs();
+      final libraryProvider = context.read<LibraryProvider>();
+      libraryProvider.loadSongs();
       context.read<PlaylistProvider>().loadPlaylists();
+      
+      // Connect to WebSocket for real-time playlist download updates
+      final webSocketService = context.read<WebSocketService>();
+      final downloadService = context.read<DownloadService>();
+      final playlistProvider = context.read<PlaylistProvider>();
+      webSocketService.setOnPlaylistCompleted(() {
+        libraryProvider.loadSongs();
+      });
+      webSocketService.setDownloadService(downloadService);
+      webSocketService.setPlaylistProvider(playlistProvider);
+      webSocketService.connect();
     });
   }
 

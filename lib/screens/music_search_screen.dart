@@ -4,6 +4,7 @@ import '../providers/search_provider.dart';
 import '../widgets/search_bar_widget.dart';
 import '../widgets/music_card.dart';
 import '../widgets/playlist_card.dart';
+import '../widgets/playlist_download_progress.dart';
 import 'package:html_unescape/html_unescape.dart';
 
 class MusicSearchScreen extends StatefulWidget {
@@ -53,6 +54,8 @@ class _MusicSearchScreenState extends State<MusicSearchScreen> {
 
     return Column(
       children: [
+        // Playlist download progress indicator
+        const PlaylistDownloadProgress(),
         Row(
           children: [
             Expanded(

@@ -90,7 +90,7 @@ class DownloadService with ChangeNotifier {
       _downloadQueue.removeFirst();
       if (!isQueueScreenVisible) {
         showToast(
-          "✓ Downloaded: ${songMetadata.title}",
+          "Downloaded: ${songMetadata.title}",
           duration: const Duration(seconds: 3),
         );
       }
@@ -101,7 +101,7 @@ class DownloadService with ChangeNotifier {
       _downloadQueue.removeFirst();
       if (!isQueueScreenVisible) {
         showToast(
-          "✗ Download failed: ${video.title}",
+          "Download failed: ${video.title}",
           duration: const Duration(seconds: 3),
         );
       }
