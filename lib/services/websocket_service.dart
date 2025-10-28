@@ -16,7 +16,7 @@ class WebSocketService with ChangeNotifier {
   final String _serverUrl = 'wss://lasandra-sultriest-bumblingly.ngrok-free.dev/ws';
   
   // Playlist download progress tracking
-  Map<String, PlaylistDownloadProgress> _playlistProgress = {};
+  final Map<String, PlaylistDownloadProgress> _playlistProgress = {};
   
   // Callback for library refresh
   VoidCallback? _onPlaylistCompleted;
@@ -28,7 +28,10 @@ class WebSocketService with ChangeNotifier {
   PlaylistProvider? _playlistProvider;
   
   // Track songs for each playlist to create playlists later
-  Map<String, List<String>> _playlistSongs = {};
+  final Map<String, List<String>> _playlistSongs = {};
+  
+  // Track created playlists for albums
+  final Map<String, String> _createdPlaylists = {};
   
   bool get isConnected => _isConnected;
   Map<String, PlaylistDownloadProgress> get playlistProgress => _playlistProgress;
@@ -95,10 +98,10 @@ class WebSocketService with ChangeNotifier {
           _handlePlaylistFailed(data);
           break;
         default:
-          print('Unknown message type: $type');
+          debugPrint('Unknown message type: $type');
       }
     } catch (e) {
-      print('Error parsing WebSocket message: $e');
+      debugPrint('Error parsing WebSocket message: $e');
     }
   }
 
@@ -144,7 +147,7 @@ class WebSocketService with ChangeNotifier {
     }
   }
 
-  void _handleSongCompleted(Map<String, dynamic> data) {
+  void _handleSongCompleted(Map<String, dynamic> data) async {
     final playlistId = data['playlist_id'] as String;
     final completed = data['completed'] as int;
     final total = data['total'] as int;
@@ -178,6 +181,18 @@ class WebSocketService with ChangeNotifier {
           duration: 'Unknown',
         );
         _downloadService!.addToQueue(video);
+        
+        // Create playlist when first song is received
+        if (completed == 1 && _playlistProvider != null && !_createdPlaylists.containsKey(playlistId)) {
+          await _createPlaylistForAlbum(playlistId, progress.title);
+        }
+        
+        // Add song to playlist after a delay to ensure it's in the library
+        if (_createdPlaylists.containsKey(playlistId)) {
+          Future.delayed(const Duration(seconds: 2), () async {
+            await _addSongToCreatedPlaylist(playlistId, videoId, songTitle);
+          });
+        }
       }
       
       showToast(
@@ -232,29 +247,9 @@ class WebSocketService with ChangeNotifier {
       
       notifyListeners();
       
-      // Create playlist with downloaded songs
-      if (_playlistProvider != null && _playlistSongs.containsKey(playlistId)) {
-        final progress = _playlistProgress[playlistId]!;
-        final songTitles = _playlistSongs[playlistId]!;
-        
-        // Create the playlist after a short delay to ensure songs are in library
-        Future.delayed(const Duration(seconds: 3), () async {
-          await _playlistProvider!.createPlaylist(progress.title);
-          
-          // Add songs to the playlist
-          for (final songTitle in songTitles) {
-            await _playlistProvider!.addSongToPlaylist(progress.title, songTitle);
-          }
-          
-          showToast(
-            "Created playlist: ${progress.title}",
-            duration: const Duration(seconds: 3),
-          );
-        });
-        
-        // Clean up song tracking
-        _playlistSongs.remove(playlistId);
-      }
+      // Clean up tracking data
+      _playlistSongs.remove(playlistId);
+      _createdPlaylists.remove(playlistId);
       
       // Trigger library refresh callback
       _onPlaylistCompleted?.call();
@@ -311,6 +306,69 @@ class WebSocketService with ChangeNotifier {
     }
     _isConnected = false;
     notifyListeners();
+  }
+
+  Future<void> _createPlaylistForAlbum(String playlistId, String albumTitle) async {
+    try {
+      final playlist = await _playlistProvider!.createPlaylist(albumTitle);
+      if (playlist != null) {
+        _createdPlaylists[playlistId] = playlist.id;
+        showToast(
+          "Created playlist: $albumTitle",
+          duration: const Duration(seconds: 3),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error creating playlist: $e');
+      showToast(
+        "Failed to create playlist: $albumTitle",
+        duration: const Duration(seconds: 3),
+      );
+    }
+  }
+  
+  Future<void> _addSongToCreatedPlaylist(String playlistId, String videoId, String songTitle) async {
+    try {
+      final createdPlaylistId = _createdPlaylists[playlistId];
+      if (createdPlaylistId == null) return;
+      
+      // Try to find the song in the library by video ID or title
+      final libraryProvider = _downloadService?.libraryProvider;
+      if (libraryProvider != null) {
+        // Wait a bit more to ensure the song is loaded in the library
+        await libraryProvider.loadSongs();
+        final songs = libraryProvider.songs;
+        
+        // Find the song by video ID first, then by title
+        Map<String, dynamic>? foundSong;
+        for (final song in songs) {
+          if (song['video_id'] == videoId || 
+              (song['title'] != null && song['title'].toString().toLowerCase() == songTitle.toLowerCase()) ||
+              (song['name'] != null && song['name'].toString().toLowerCase() == songTitle.toLowerCase())) {
+            foundSong = song;
+            break;
+          }
+        }
+        
+        if (foundSong != null) {
+          await _playlistProvider!.addSongToPlaylist(createdPlaylistId, foundSong);
+        } else {
+          // Fallback: create a minimal song object
+          final songObject = {
+            'title': songTitle,
+            'name': songTitle,
+            'artist': 'Unknown Artist',
+            'album': 'Unknown Album',
+            'path': '', // This will be updated when the actual file is available
+            'video_id': videoId,
+            'id': videoId,
+          };
+          await _playlistProvider!.addSongToPlaylist(createdPlaylistId, songObject);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error adding song to playlist: $e');
+    }
   }
 
   @override

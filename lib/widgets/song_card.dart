@@ -20,6 +20,7 @@ class SongCard extends StatelessWidget {
   final Future<void> Function()? onDelete;
   final String? deleteConfirmMessage;
   final Future<void> Function()? onAddToQueue;
+  final String? heroTagPrefix;
 
   const SongCard({
     super.key,
@@ -35,6 +36,7 @@ class SongCard extends StatelessWidget {
     this.onDelete,
     this.deleteConfirmMessage,
     this.onAddToQueue,
+    this.heroTagPrefix,
   });
 
   @override
@@ -108,7 +110,7 @@ class SongCard extends StatelessWidget {
               ],
               // Album Art with animated scale
               Hero(
-                tag: 'song_$songPath',
+                tag: '${heroTagPrefix ?? 'song'}_$songPath',
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   width: showDragHandle ? 56 : 60,

@@ -1,9 +1,11 @@
+import 'package:rxdart/rxdart.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:audio_session/audio_session.dart';
 import 'dart:async';
-import 'dart:convert';
 import 'dart:typed_data';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
-import 'package:rxdart/rxdart.dart';
 import '../utils/song_data_helper.dart';
 
 /// A service to manage audio playback.
@@ -58,7 +60,9 @@ class AudioPlayerService {
   /// The underlying [AudioPlayer] instance.
   AudioPlayer get audioPlayer => _audioPlayer;
 
-  void _init() {
+  void _init() async {
+    final session = await AudioSession.instance;
+    await session.configure(const AudioSessionConfiguration.music());
     _audioPlayer.setLoopMode(LoopMode.all);
     _audioPlayer.currentIndexStream.listen((index) {
       if (index != null &&
@@ -81,12 +85,12 @@ class AudioPlayerService {
   }
 
   /// Converts album art bytes to a URI for MediaItem
-  Uri? _albumArtToUri(Uint8List? albumArt) {
+  Future<Uri?> _albumArtToUri(Uint8List? albumArt) async {
     if (albumArt == null) return null;
-
-    // Convert bytes to base64 data URI
-    final base64String = base64Encode(albumArt);
-    return Uri.parse('data:image/jpeg;base64,$base64String');
+    final tempDir = await getTemporaryDirectory();
+    final tempFile = File('${tempDir.path}/album_art.jpg');
+    await tempFile.writeAsBytes(albumArt);
+    return Uri.file(tempFile.path);
   }
 
   /// Plays a single song.
@@ -102,35 +106,35 @@ class AudioPlayerService {
   }) async {
     if (songs.isEmpty) return;
 
-    // Debug print meta data for all songs in queue
-    for (var i = 0; i < songs.length; i++) {
-      final songData = SongData(songs[i]);
-      print(
-        '[DEBUG] Song $i: title="${songData.title}", artist="${songData.artist}", album="${songData.album}", path="${songData.path}", hasArt=${songData.albumArt != null}',
-      );
-    }
-
     _playlistSubject.add(songs);
 
     final playlist = ConcatenatingAudioSource(
       useLazyPreparation: true,
-      children: songs.map((song) {
+      children: await Future.wait(songs.map((song) async {
         final songData = SongData(song);
+        final artUri = await _albumArtToUri(songData.albumArt);
         final mediaItem = MediaItem(
           id: songData.id,
           title: songData.title,
           artist: songData.artist,
-          artUri: _albumArtToUri(songData.albumArt),
+          album: songData.album,
+          duration: songData.duration != null
+              ? Duration(seconds: songData.duration!)
+              : null,
+          artUri: artUri,
+          displayTitle: songData.title,
+          displaySubtitle: songData.artist,
+          displayDescription: songData.album,
           extras: {
             ...song,
-            'artUri': _albumArtToUri(songData.albumArt)?.toString(),
+            'artUri': artUri?.toString(),
           },
         );
         final uri = songData.path.startsWith('http')
             ? Uri.parse(songData.path)
             : Uri.file(songData.path);
         return AudioSource.uri(uri, tag: mediaItem);
-      }).toList(),
+      })),
     );
 
     await _audioPlayer.setShuffleModeEnabled(shuffle);
@@ -141,14 +145,22 @@ class AudioPlayerService {
 
   Future<void> addToQueue(Map<String, dynamic> song) async {
     final songData = SongData(song);
+    final artUri = await _albumArtToUri(songData.albumArt);
     final mediaItem = MediaItem(
       id: songData.id,
       title: songData.title,
       artist: songData.artist,
-      artUri: _albumArtToUri(songData.albumArt),
+      album: songData.album,
+      duration: songData.duration != null
+          ? Duration(seconds: songData.duration!)
+          : null,
+      artUri: artUri,
+      displayTitle: songData.title,
+      displaySubtitle: songData.artist,
+      displayDescription: songData.album,
       extras: {
         ...song,
-        'artUri': _albumArtToUri(songData.albumArt)?.toString(),
+        'artUri': artUri?.toString(),
       },
     );
     final uri = songData.path.startsWith('http')
@@ -170,7 +182,6 @@ class AudioPlayerService {
     currentPlaylist.add(song);
     _playlistSubject.add(currentPlaylist);
   }
-
   /// Toggles between play and pause.
   void playPause() {
     if (_audioPlayer.playing) {

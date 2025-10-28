@@ -29,6 +29,7 @@ class QueueScreen extends StatelessWidget {
                 return SongCard(
                   key: ValueKey(song['path']),
                   song: song,
+                  heroTagPrefix: 'queue',
                   isPlaying: musicPlayerProvider.currentSong?['path'] == song['path'] &&
                       musicPlayerProvider.isPlaying,
                   onTap: () {

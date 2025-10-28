@@ -34,6 +34,8 @@ class DownloadService with ChangeNotifier {
     _libraryProvider = libraryProvider;
   }
 
+  LibraryProvider? get libraryProvider => _libraryProvider;
+
   Future<void> initialize() async {
     final appDocDir = await getApplicationDocumentsDirectory();
     _downloadDirectory = '${appDocDir.path}/MusicDownloads';

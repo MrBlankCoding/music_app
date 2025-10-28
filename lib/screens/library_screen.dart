@@ -153,6 +153,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
         return SongCard(
           song: song,
+          heroTagPrefix: 'library',
           isPlaying: isPlaying && musicPlayerProvider.isPlaying,
           onTap: () async {
             if (musicPlayerProvider.currentSong?['path'] != song['path']) {

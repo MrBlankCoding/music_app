@@ -383,6 +383,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                   key: ValueKey(songPath),
                   cardKey: ValueKey(songPath),
                   song: song,
+                  heroTagPrefix: 'playlist_${playlist.id}',
                   isPlaying: isPlaying && musicPlayerProvider.isPlaying,
                   showDragHandle: true,
                   reorderIndex: index,

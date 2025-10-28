@@ -23,6 +23,9 @@ Future<void> main() async {
     androidNotificationChannelId: 'com.musicapp.channel.audio',
     androidNotificationChannelName: 'Music Playback',
     androidNotificationOngoing: true,
+    androidNotificationIcon: 'drawable/ic_launcher',
+    androidShowNotificationBadge: true,
+    androidStopForegroundOnPause: true,
   );
 
   final musicPlayerProvider = MusicPlayerProvider();
